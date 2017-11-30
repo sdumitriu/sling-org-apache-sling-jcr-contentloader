@@ -1,0 +1,37 @@
+{
+    "jcr:primaryType" : "sling:Folder",
+    "security:principals": [
+        { 
+            "name": "sling7268_user", 
+            "password": "mypassword"
+        },
+        { 
+            "name": "sling7268_group", 
+            "isgroup": true,
+            "members":[
+               "sling7268_user"
+            ]
+        }
+    ],
+    "security:acl": [
+        { 
+            "principal": "everyone", 
+            "granted": [
+                "jcr:read"
+            ]
+        },
+        { 
+            "principal": "sling7268_user", 
+            "granted": [
+                "jcr:read",
+                "jcr:write"
+            ]
+        },
+        { 
+            "principal": "sling7268_group", 
+            "granted": [
+                "jcr:modifyAccessControl"
+            ]
+        }
+    ]
+}

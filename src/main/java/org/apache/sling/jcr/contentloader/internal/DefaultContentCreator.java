@@ -831,8 +831,20 @@ public class DefaultContentCreator implements ContentCreator {
     public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames, String order) throws RepositoryException {
         final Node parentNode = this.parentNodeStack.peek();
         Session session = parentNode.getSession();
+        
         PrincipalManager principalManager = AccessControlUtil.getPrincipalManager(session);
         Principal principal = principalManager.getPrincipal(principalId);
+        if (principal == null) {
+            // SLING-7268 - as pointed out in OAK-5496, we cannot successfully use PrincipalManager#getPrincipal in oak 
+        	//  without the session that created the principal getting saved first (and a subsequent index update).  
+        	//  Workaround by trying the UserManager#getAuthorizable API to locate the principal. 
+            UserManager userManager = AccessControlUtil.getUserManager(session);
+            final Authorizable authorizable = userManager.getAuthorizable(principalId);
+            if (authorizable != null) {
+                principal = authorizable.getPrincipal();
+            }
+        }
+        		
         if (principal == null) {
             throw new RepositoryException("No principal found for id: " + principalId);
         }
