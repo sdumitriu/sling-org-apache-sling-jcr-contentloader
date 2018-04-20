@@ -23,8 +23,6 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -36,7 +34,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 import java.util.StringTokenizer;
-import java.util.regex.Pattern;
 
 import javax.jcr.Item;
 import javax.jcr.ItemNotFoundException;
@@ -52,6 +49,7 @@ import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.apache.jackrabbit.api.security.user.Group;
 import org.apache.jackrabbit.api.security.user.User;
 import org.apache.jackrabbit.api.security.user.UserManager;
+import org.apache.jackrabbit.util.ISO8601;
 import org.apache.sling.jcr.base.util.AccessControlUtil;
 import org.apache.sling.jcr.contentloader.ContentCreator;
 import org.apache.sling.jcr.contentloader.ContentImportListener;
@@ -70,10 +68,6 @@ public class DefaultContentCreator implements ContentCreator {
     final Logger log = LoggerFactory.getLogger(DefaultContentCreator.class);
 
     private ImportOptions configuration;
-
-    private final Pattern jsonDatePattern = Pattern.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}[-+]{1}[0-9]{2}[:]{0,1}[0-9]{2}$");
-
-    private final SimpleDateFormat jsonDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
 
     private final Stack<Node> parentNodeStack = new Stack<Node>();
 
@@ -312,12 +306,7 @@ public class DefaultContentCreator implements ContentCreator {
             }
         } else if (propertyType == PropertyType.DATE) {
             checkoutIfNecessary(node);
-            try {
-                node.setProperty(name, parseDateString(value));
-            } catch (ParseException e) {
-                // Fall back to default behaviour if this fails
-                node.setProperty(name, value, propertyType);
-            }
+            node.setProperty(name, ISO8601.parse(value));
             if (this.importListener != null) {
                 this.importListener.onCreate(node.getProperty(name).getPath());
             }
@@ -363,21 +352,17 @@ public class DefaultContentCreator implements ContentCreator {
             }
         } else if (propertyType == PropertyType.DATE) {
             checkoutIfNecessary(node);
-            try {
-                // This modification is to remove the colon in the JSON Timezone
-                ValueFactory valueFactory = node.getSession().getValueFactory();
-                Value[] jcrValues = new Value[values.length];
+            
+            // This modification is to remove the colon in the JSON Timezone
+            ValueFactory valueFactory = node.getSession().getValueFactory();
+            Value[] jcrValues = new Value[values.length];
 
-                for (int i = 0; i < values.length; i++) {
-                    jcrValues[i] = valueFactory.createValue(parseDateString(values[i]));
-                }
-
-                node.setProperty(name, jcrValues, propertyType);
-            } catch (ParseException e) {
-                // If this fails, fallback to the default
-                log.warn("Could not create dates for property, falling back to defaults", e);
-                node.setProperty(name, values, propertyType);
+            for (int i = 0; i < values.length; i++) {
+                jcrValues[i] = valueFactory.createValue(ISO8601.parse(values[i]));
             }
+
+            node.setProperty(name, jcrValues, propertyType);
+            
             if (this.importListener != null) {
                 this.importListener.onCreate(node.getProperty(name).getPath());
             }
@@ -575,25 +560,6 @@ public class DefaultContentCreator implements ContentCreator {
 
         Item item = session.getItem(path);
         return (item.isNode()) ? (Node) item : null;
-    }
-
-    private Calendar parseDateString(String value) throws ParseException {
-        if (jsonDatePattern.matcher(value).matches()) {
-            String modifiedJsonDate = value;
-
-            // This modification is to remove the colon in the JSON Timezone
-            // to match the Java Version
-            if (value.lastIndexOf(":") == 26) {
-                modifiedJsonDate = value.substring(0, 26) + value.substring(27);
-            }
-
-            Calendar cal = Calendar.getInstance();
-            cal.setTime(jsonDateFormat.parse(modifiedJsonDate));
-
-            return cal;
-        }
-
-        return null;
     }
 
     private void createProperty(String name, Object value, boolean overwriteExisting) throws RepositoryException {

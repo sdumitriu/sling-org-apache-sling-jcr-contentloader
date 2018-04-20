@@ -361,5 +361,10 @@
         	<type>bundle</type>
         	<scope>test</scope>
         </dependency>
+        <dependency>
+        	<groupId>org.apache.jackrabbit</groupId>
+        	<artifactId>jackrabbit-jcr-commons</artifactId>
+        	<version>2.2.9</version>
+        </dependency>
     </dependencies>
 </project>
