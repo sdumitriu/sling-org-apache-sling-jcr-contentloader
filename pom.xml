@@ -29,7 +29,7 @@
     </parent>
 
     <artifactId>org.apache.sling.jcr.contentloader</artifactId>
-    <version>2.2.5-SNAPSHOT</version>
+    <version>2.2.6</version>
     <packaging>bundle</packaging>
 
     <name>Apache Sling Initial Content Loader</name>
@@ -50,7 +50,8 @@
         <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-jcr-contentloader.git</connection>
         <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-jcr-contentloader.git</developerConnection>
         <url>https://gitbox.apache.org/repos/asf?p=sling-org-apache-sling-jcr-contentloader.git</url>
-    </scm>
+      <tag>org.apache.sling.jcr.contentloader-2.2.6</tag>
+  </scm>
 
     <build>
         <plugins>
