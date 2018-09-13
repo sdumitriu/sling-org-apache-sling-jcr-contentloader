@@ -18,28 +18,30 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 
 import javax.jcr.Node;
 import javax.jcr.RepositoryException;
 import javax.jcr.nodetype.NodeType;
 
-import org.apache.sling.commons.testing.junit.Retry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.ops4j.pax.exam.junit.PaxExam;
+import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
+import org.ops4j.pax.exam.spi.reactors.PerClass;
 import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.osgi.framework.Bundle;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 /** Basic test of a bundle that provides initial content */
 @RunWith(PaxExam.class)
-public class I18nInitialContentIT extends ContentBundleTestBase {
-    
+@ExamReactorStrategy(PerClass.class)
+public class I18nInitialContentIT extends ContentloaderTestSupport {
+
     protected TinyBundle setupTestBundle(TinyBundle b) throws IOException {
         b.set(SLING_INITIAL_CONTENT_HEADER, DEFAULT_PATH_IN_BUNDLE + ";ignoreImportProviders:=json;path:=" + contentRootPath);
         addContent(b, DEFAULT_PATH_IN_BUNDLE, "i18n/en.json");
@@ -48,15 +50,13 @@ public class I18nInitialContentIT extends ContentBundleTestBase {
     }
     
     @Test
-    @Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
     public void bundleStarted() {
-        final Bundle b = PaxExamUtilities.findBundle(bundleContext, bundleSymbolicName);
+        final Bundle b = findBundle(bundleSymbolicName);
         assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
         assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
     }
     
     @Test
-    @Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
     public void i18nJsonFile() throws RepositoryException {
         final String filePath = contentRootPath + "/i18n/en.json"; 
         assertTrue("file node " + filePath + " exists", session.itemExists(filePath)); 

@@ -18,10 +18,6 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,19 +37,25 @@ import javax.jcr.security.Privilege;
 import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.apache.jackrabbit.api.security.user.Group;
 import org.apache.jackrabbit.api.security.user.UserManager;
-import org.apache.sling.commons.testing.junit.Retry;
 import org.apache.sling.jcr.base.util.AccessControlUtil;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.ops4j.pax.exam.junit.PaxExam;
+import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
+import org.ops4j.pax.exam.spi.reactors.PerClass;
 import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.osgi.framework.Bundle;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /** test of a bundle that provides initial content that creates a user/group and defines an ace 
  *  for those principals within the same transaction 
  */
 @RunWith(PaxExam.class)
-public class SLING7268InitialContentIT extends ContentBundleTestBase {
+@ExamReactorStrategy(PerClass.class)
+public class SLING7268InitialContentIT extends ContentloaderTestSupport {
 
 	protected TinyBundle setupTestBundle(TinyBundle b) throws IOException {
 		b.set(SLING_INITIAL_CONTENT_HEADER, DEFAULT_PATH_IN_BUNDLE + ";path:=" + contentRootPath);
@@ -62,15 +64,13 @@ public class SLING7268InitialContentIT extends ContentBundleTestBase {
 	}
 
 	@Test
-	@Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
 	public void bundleStarted() {
-		final Bundle b = PaxExamUtilities.findBundle(bundleContext, bundleSymbolicName);
+		final Bundle b = findBundle(bundleSymbolicName);
 		assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
 		assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
 	}
 
 	@Test
-	@Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
 	public void initialContentInstalled() throws RepositoryException {
 		final String folderPath = contentRootPath + "/SLING-7268"; 
 		assertTrue("Expecting initial content to be installed", session.itemExists(folderPath)); 
@@ -78,7 +78,6 @@ public class SLING7268InitialContentIT extends ContentBundleTestBase {
 	}
 
 	@Test
-	@Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
 	public void userCreated() throws RepositoryException {
 		UserManager userManager = AccessControlUtil.getUserManager(session);
 		Authorizable authorizable = userManager.getAuthorizable("sling7268_user");
@@ -86,7 +85,6 @@ public class SLING7268InitialContentIT extends ContentBundleTestBase {
 	}
 
 	@Test
-	@Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
 	public void groupCreated() throws RepositoryException {
 		UserManager userManager = AccessControlUtil.getUserManager(session);
 		Authorizable authorizable = userManager.getAuthorizable("sling7268_group");
@@ -99,7 +97,6 @@ public class SLING7268InitialContentIT extends ContentBundleTestBase {
 	}
 
 	@Test
-	@Retry(intervalMsec=RETRY_INTERVAL, timeoutMsec=RETRY_TIMEOUT)
 	public void aceCreated() throws RepositoryException {
 		final String folderPath = contentRootPath + "/SLING-7268"; 
 		assertTrue("Expecting test folder to exist", session.itemExists(folderPath)); 

@@ -1,0 +1,8 @@
+Bundle-Category:\
+  sling,\
+  jcr,\
+  jackrabbit
+
+-includeresource:\
+  @kxml2-*.jar,\
+  @org.apache.sling.jcr.contentparser-*.jar!/org/apache/sling/jcr/contentparser/impl/JsonTicksConverter.class
