@@ -32,9 +32,9 @@ import java.util.Map;
 
 import javax.jcr.RepositoryException;
 
-import junit.framework.TestCase;
-
 import org.apache.sling.jcr.contentloader.ContentCreator;
+
+import junit.framework.TestCase;
 
 public class XmlReaderTest extends TestCase {
 

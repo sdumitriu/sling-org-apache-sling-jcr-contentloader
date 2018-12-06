@@ -141,7 +141,7 @@ public class DefaultContentCreatorTest {
             exactly(2).of(parentNode).getPath(); will(returnValue("/" + rootNodeName));
             oneOf(parentNode).isNode(); will(returnValue(true));
             oneOf(parentNode).isNodeType("mix:referenceable"); will(returnValue(true));
-            oneOf(parentNode).getUUID(); will(returnValue(uuid));
+            oneOf(parentNode).getIdentifier(); will(returnValue(uuid));
             oneOf(parentNode).getSession(); will(returnValue(session));
             oneOf(parentNode).hasProperty(with(any(String.class)));
             oneOf(parentNode).setProperty(propertyName, uuid, PropertyType.REFERENCE);
@@ -261,7 +261,8 @@ public class DefaultContentCreatorTest {
 
     @Test
     public void createNodeWithoutProvidedNames() throws RepositoryException, NoSuchFieldException {
-        Stack nodesStack = (Stack)PrivateAccessor.getField(contentCreator, "parentNodeStack");
+        @SuppressWarnings("unchecked")
+		Stack<Node> nodesStack = (Stack<Node>)PrivateAccessor.getField(contentCreator, "parentNodeStack");
 
         contentCreator.init(ImportOptionsFactory.createImportOptions(true, true, true, false, false),
                 new HashMap<String, ContentReader>(), null, null);
@@ -303,7 +304,8 @@ public class DefaultContentCreatorTest {
     public void addMixinsToExistingNode() throws RepositoryException, NoSuchFieldException {
         final String newNodeName = uniqueId();
         final String[] mixins = {"mix:versionable"};
-        final List<Node> versionables = (List<Node>) PrivateAccessor.getField(contentCreator, "versionables");
+        @SuppressWarnings("unchecked")
+		final List<Node> versionables = (List<Node>) PrivateAccessor.getField(contentCreator, "versionables");
 
         contentCreator.init(ImportOptionsFactory.createImportOptions(false, false, false, true, false),
                 new HashMap<String, ContentReader>(), null, null);
@@ -364,7 +366,8 @@ public class DefaultContentCreatorTest {
         final String propName = uniqueId();
         final String[] propValues = {uniqueId(), uniqueId()};
         final ContentImportListener listener = mockery.mock(ContentImportListener.class);
-        final Map<String, String[]> delayedMultipleReferences =
+        @SuppressWarnings("unchecked")
+		final Map<String, String[]> delayedMultipleReferences =
                 (Map<String, String[]>)PrivateAccessor.getField(contentCreator, "delayedMultipleReferences");
         this.mockery.checking(new Expectations(){{
             oneOf(listener).onCreate(with(any(String.class)));
@@ -449,7 +452,8 @@ public class DefaultContentCreatorTest {
     public void finishNodeWithMultipleProperty() throws RepositoryException, NoSuchFieldException {
         final String propName = uniqueId();
         final String underTestNodeName = uniqueId();
-        final Map<String, List<String>> delayedMultipleReferences =
+        @SuppressWarnings("unchecked")
+		final Map<String, List<String>> delayedMultipleReferences =
                 (Map<String, List<String>>) PrivateAccessor.getField(contentCreator, "delayedMultipleReferences");
         final ContentImportListener listener = mockery.mock(ContentImportListener.class);
 
@@ -494,7 +498,7 @@ public class DefaultContentCreatorTest {
         underTest.addMixin("mix:referenceable");
 
         contentCreator.finishNode();
-        assertEquals(underTest.getUUID(), parentNode.getProperty(propName).getString());
+        assertEquals(underTest.getIdentifier(), parentNode.getProperty(propName).getString());
         mockery.assertIsSatisfied();
     }
 

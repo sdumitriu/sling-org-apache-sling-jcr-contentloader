@@ -18,28 +18,35 @@
  */
 package org.apache.sling.jcr.contentloader.internal;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Dictionary;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Map;
+
 import org.apache.sling.commons.osgi.ManifestHeader;
 import org.jmock.Expectations;
-import org.jmock.Mockery;
-import org.jmock.integration.junit4.JMock;
-import org.jmock.integration.junit4.JUnit4Mockery;
+import org.jmock.integration.junit4.JUnitRuleMockery;
+import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.osgi.framework.Bundle;
 
-import java.util.*;
-
-import static org.junit.Assert.*;
-
-@RunWith(JMock.class)
 public class PathEntryTest {
     final String pathEntryPath = "/test/path";
-    Mockery mockery = new JUnit4Mockery();
+    
+    @Rule
+    public final JUnitRuleMockery mockery = new JUnitRuleMockery();
 
     @Test
     public void testGetContentPaths(){
         final Bundle bundle = mockery.mock(Bundle.class);
-        final Dictionary<String, String> dict = new Hashtable();
+        final Dictionary<String, String> dict = new Hashtable<>();
         dict.put("Bnd-LastModified", "1258555936230");
         dict.put(PathEntry.CONTENT_HEADER, "test1, test2");
         //PathEntry#getContentPaths should return this value

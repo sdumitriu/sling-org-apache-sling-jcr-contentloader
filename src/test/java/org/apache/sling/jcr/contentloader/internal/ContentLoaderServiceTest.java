@@ -31,6 +31,8 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleEvent;
 
 import javax.jcr.*;
+import javax.jcr.lock.LockManager;
+
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -71,8 +73,10 @@ public class ContentLoaderServiceTest {
     @Test
     public void testBundleResolvedBundleChanged() throws NoSuchFieldException, RepositoryException {
         final Bundle bundle = createNewBundle();
-        final List<Bundle> delayedBundles = (List<Bundle>) PrivateAccessor.getField(contentLoader, "delayedBundles");
-        final Set<String> updatedBundles = (Set<String>) PrivateAccessor.getField(underTest, "updatedBundles");
+        @SuppressWarnings("unchecked")
+		final List<Bundle> delayedBundles = (List<Bundle>) PrivateAccessor.getField(contentLoader, "delayedBundles");
+        @SuppressWarnings("unchecked")
+		final Set<String> updatedBundles = (Set<String>) PrivateAccessor.getField(underTest, "updatedBundles");
 
         updatedBundles.add(bundle.getSymbolicName());
         int updatedBundlesCurrentAmout = updatedBundles.size();
@@ -96,7 +100,12 @@ public class ContentLoaderServiceTest {
         final Node bcNode = (Node)session.getItem(ContentLoaderService.BUNDLE_CONTENT_NODE);
         bcNode.addNode(bundle.getSymbolicName()).addMixin("mix:lockable");
         session.save();
-        bcNode.getNode(bundle.getSymbolicName()).lock(false, true);
+        LockManager lockManager = session.getWorkspace().getLockManager();
+        lockManager.lock(bcNode.getNode(bundle.getSymbolicName()).getPath(), 
+        		false, // isDeep 
+        		true, // isSessionScoped 
+        		Long.MAX_VALUE, // timeoutHint 
+        		null); // ownerInfo
 
         assertNull(underTest.getBundleContentInfo(session, bundle, false));
     }

@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.StringTokenizer;
 
+import javax.jcr.Binary;
 import javax.jcr.Item;
 import javax.jcr.ItemNotFoundException;
 import javax.jcr.Node;
@@ -43,6 +44,7 @@ import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import javax.jcr.Value;
 import javax.jcr.ValueFactory;
+import javax.jcr.version.VersionManager;
 
 import org.apache.jackrabbit.api.security.principal.PrincipalManager;
 import org.apache.jackrabbit.api.security.user.Authorizable;
@@ -379,7 +381,7 @@ public class DefaultContentCreator implements ContentCreator {
         }
     }
 
-    protected Value createValue(final ValueFactory factory, Object value) {
+    protected Value createValue(final ValueFactory factory, Object value) throws RepositoryException {
         if (value == null) {
             return null;
         }
@@ -396,7 +398,8 @@ public class DefaultContentCreator implements ContentCreator {
         } else if (value instanceof Boolean) {
             return factory.createValue((Boolean) value);
         } else if (value instanceof InputStream) {
-            return factory.createValue((InputStream) value);
+        	Binary binary = factory.createBinary((InputStream)value);
+        	return factory.createValue(binary);
         } else {
             return factory.createValue(value.toString());
         }
@@ -454,7 +457,7 @@ public class DefaultContentCreator implements ContentCreator {
             if (item.isNode()) {
                 Node refNode = (Node) item;
                 if (refNode.isNodeType("mix:referenceable")) {
-                    return refNode.getUUID();
+                    return refNode.getIdentifier();
                 }
             }
         } else {
@@ -483,7 +486,7 @@ public class DefaultContentCreator implements ContentCreator {
         }
 
         Session session = node.getSession();
-        String uuid = node.getUUID();
+        String uuid = node.getIdentifier();
 
         for (String property : props) {
             String name = getName(property);
@@ -879,7 +882,9 @@ public class DefaultContentCreator implements ContentCreator {
             Node versionableNode = findVersionableAncestor(node);
             if (versionableNode != null) {
                 if (!versionableNode.isCheckedOut()) {
-                    versionableNode.checkout();
+                	VersionManager versionManager = versionableNode.getSession().getWorkspace().getVersionManager();
+                	versionManager.checkout(versionableNode.getPath());
+                	
                     if (this.importListener != null) {
                         this.importListener.onCheckout(versionableNode.getPath());
                     }

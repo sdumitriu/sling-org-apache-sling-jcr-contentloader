@@ -20,15 +20,12 @@ package org.apache.sling.jcr.contentloader.internal.readers;
 
 import org.apache.sling.jcr.contentloader.internal.JsonReaderTest;
 import org.jmock.Expectations;
-import org.jmock.integration.junit4.JMock;
-import org.junit.runner.RunWith;
 
 /**
  * testing specific ordered json import case:
  * - should work with all normal json cases,
  * - should work for specific ordered case
  */
-@RunWith(JMock.class)
 public class OrderedJsonReaderTest extends JsonReaderTest {
 
     @Override

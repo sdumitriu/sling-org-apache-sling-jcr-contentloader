@@ -116,10 +116,10 @@ public interface ContentCreator {
      * If the path does not exist and node type is null, false is
      * returned.
      * When the changes to the node are finished, {@link #finishNode()}
-     * must be callsed.
+     * must be called.
      *
      * @param subPath     The relative path
-     * @param newNodeType Node typ for newly created nodes.
+     * @param newNodeType Node type for newly created nodes.
      * @throws RepositoryException
      */
     boolean switchCurrentNode(String subPath, String newNodeType) throws RepositoryException;

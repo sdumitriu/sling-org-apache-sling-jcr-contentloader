@@ -31,18 +31,16 @@ import javax.json.JsonWriter;
 import org.apache.sling.jcr.contentloader.ContentCreator;
 import org.apache.sling.jcr.contentloader.internal.readers.JsonReader;
 import org.jmock.Expectations;
-import org.jmock.Mockery;
 import org.jmock.Sequence;
-import org.jmock.integration.junit4.JMock;
-import org.jmock.integration.junit4.JUnit4Mockery;
-import org.junit.runner.RunWith;
+import org.jmock.integration.junit4.JUnitRuleMockery;
+import org.junit.Rule;
 
-@RunWith(JMock.class)
 public class JsonReaderTest {
 
     protected JsonReader jsonReader;
 
-    protected Mockery mockery = new JUnit4Mockery();
+    @Rule
+    public final JUnitRuleMockery mockery = new JUnitRuleMockery();
 
     protected ContentCreator creator;
 

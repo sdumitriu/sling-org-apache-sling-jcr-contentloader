@@ -26,6 +26,7 @@ import java.util.List;
 import javax.jcr.Node;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
+import javax.jcr.version.VersionManager;
 
 import org.apache.sling.commons.mime.MimeTypeService;
 import org.apache.sling.jcr.contentloader.ContentImportListener;
@@ -126,7 +127,8 @@ public class DefaultContentImporter extends BaseImportLoader implements ContentH
 
         // finally checkin versionable nodes
         for (final Node versionable : contentCreator.getVersionables()) {
-            versionable.checkin();
+        	VersionManager versionManager = versionable.getSession().getWorkspace().getVersionManager();
+        	versionManager.checkin(versionable.getPath());
             if (importListener != null) {
                 importListener.onCheckin(versionable.getPath());
             }

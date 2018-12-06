@@ -31,6 +31,7 @@ import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import javax.jcr.Value;
 import javax.jcr.lock.LockException;
+import javax.jcr.lock.LockManager;
 
 import org.apache.sling.commons.mime.MimeTypeService;
 import org.apache.sling.jcr.api.SlingRepository;
@@ -201,7 +202,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
                     final String token = st.nextToken();
                     if ( !node.hasNode(token) ) {
                         node.addNode(token, "sling:Folder");
-                        node.save();
+                        writerSession.save();
                     }
                     node = node.getNode(token);
                 }
@@ -209,7 +210,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
             }
             if ( !node.hasNode(path) ) {
                 node.addNode(path, "sling:Folder");
-                node.save();
+                writerSession.save();
             }
         }
     }
@@ -337,7 +338,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
             try {
                 final Node bcNode = parentNode.addNode(nodeName, "nt:unstructured");
                 bcNode.addMixin("mix:lockable");
-                parentNode.save();
+                session.save();
             } catch (RepositoryException re) {
                 // for concurrency issues (running in a cluster) we ignore exceptions
                 this.log.warn("Unable to create node " + nodeName, re);
@@ -349,7 +350,12 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
             return null;
         }
         try {
-            bcNode.lock(false, true);
+        	LockManager lockManager = session.getWorkspace().getLockManager();
+        	lockManager.lock(bcNode.getPath(), 
+        			false, // isDeep 
+        			true, // isSessionScoped 
+        			Long.MAX_VALUE, // timeoutHint 
+        			null); // ownerInfo
         } catch (LockException le) {
             return null;
         }
@@ -392,9 +398,10 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
             if ( createdNodes != null && createdNodes.size() > 0 ) {
                 bcNode.setProperty(PROPERTY_UNINSTALL_PATHS, createdNodes.toArray(new String[createdNodes.size()]));
             }
-            bcNode.save();
+            session.save();
         }
-        bcNode.unlock();
+        LockManager lockManager = session.getWorkspace().getLockManager();
+		lockManager.unlock(bcNode.getPath());
     }
 
     @Override
@@ -409,7 +416,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
                 bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_AT, Calendar.getInstance());
                 bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_BY, this.slingId);
                 bcNode.setProperty(PROPERTY_UNINSTALL_PATHS, (String[])null);
-                bcNode.save();
+                session.save();
             }
         } catch (RepositoryException re) {
             this.log.error("Unable to update bundle content info.", re);

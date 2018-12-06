@@ -40,6 +40,7 @@ import javax.jcr.NoSuchWorkspaceException;
 import javax.jcr.Node;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
+import javax.jcr.version.VersionManager;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.sling.jcr.contentloader.ContentReader;
@@ -265,7 +266,8 @@ public class BundleContentLoader extends BaseImportLoader {
 
             // finally check in versionable nodes
             for (final Node versionable : contentCreator.getVersionables()) {
-                versionable.checkin();
+            	VersionManager versionManager = versionable.getSession().getWorkspace().getVersionManager();
+            	versionManager.checkin(versionable.getPath());
             }
         } finally {
             try {
@@ -307,7 +309,6 @@ public class BundleContentLoader extends BaseImportLoader {
 
         final Map<String, Node> processedEntries = new HashMap<String, Node>();
 
-        @SuppressWarnings("unchecked")
         Enumeration<String> entries = bundle.getEntryPaths(path);
         if (entries == null) {
             // check for single content
