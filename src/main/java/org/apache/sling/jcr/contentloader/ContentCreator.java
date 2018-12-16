@@ -20,8 +20,11 @@ package org.apache.sling.jcr.contentloader;
 
 import java.io.InputStream;
 import java.util.Map;
+import java.util.Set;
 
+import javax.jcr.Node;
 import javax.jcr.RepositoryException;
+import javax.jcr.Value;
 
 import org.osgi.annotation.versioning.ProviderType;
 
@@ -164,5 +167,40 @@ public interface ContentCreator {
      * @throws RepositoryException
      */
     void createAce(String principal, String[] grantedPrivileges, String[] deniedPrivileges, String order) throws RepositoryException;
+
+    /**
+     * Creates an Access Control Entry for the current node for the specified
+     * principal and privileges.
+     *
+     * @param principal         the user or group id for the ACE
+     * @param grantedPrivileges the set of privileges to grant the principal
+     * @param deniedPrivileges  the set of privileges to deny the principal (for users only)
+     * @param order             specifies the position of the ACE in the containing ACL. (may be null)
+     *                          Value should be one of these:
+     *                          <table>
+     *                          <caption>Values</caption>
+     *                          <tr><td>first</td><td>Place the target ACE as the first amongst its siblings</td></tr>
+     *                          <tr><td>last</td><td>Place the target ACE as the last amongst its siblings</td></tr>
+     *                          <tr><td>before xyz</td><td>Place the target ACE immediately before the sibling whose name is xyz</td></tr>
+     *                          <tr><td>after xyz</td><td>Place the target ACE immediately after the sibling whose name is xyz</td></tr>
+     *                          <tr><td>numeric</td><td>Place the target ACE at the specified index</td></tr>
+     *                          </table>
+     * @param restrictions      specifies additional Map of single-value restrictions to apply. (optional)
+     * @param mvRestrictions    specifies additional Map of multi-value restrictions to apply. (optional)
+     * @param removedRestrictionNames optional set of restriction names that should be removed (if they already exist).
+     * @throws RepositoryException
+     */
+    default void createAce(String principal, String[] grantedPrivileges, String[] deniedPrivileges, String order, 
+    		Map<String, Value> restrictions, Map<String, Value[]> mvRestrictions, Set<String> removedRestrictionNames) throws RepositoryException {
+    	throw new UnsupportedOperationException();
+	}
+    
+    /**
+     * Gets the current parent Node
+     * @return the current parent node or null
+     */
+    default Node getParent() {
+    	throw new UnsupportedOperationException();
+    }
 
 }

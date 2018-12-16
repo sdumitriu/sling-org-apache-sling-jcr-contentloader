@@ -29,7 +29,7 @@
     </parent>
 
     <artifactId>org.apache.sling.jcr.contentloader</artifactId>
-    <version>2.2.7-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
 
     <name>Apache Sling Initial Content Loader</name>
     <description>This bundle provides initial content installation through bundles.</description>
@@ -158,9 +158,15 @@
       <!-- for security content loader (users/groups/acls) -->
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.jcr.base</artifactId>
-            <version>2.1.0</version>
+            <version>3.0.6</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.jackrabbit</groupId>
+            <artifactId>oak-security-spi</artifactId>
+            <version>1.8.0</version>
+            <optional>true</optional>
+        </dependency>        
         <dependency>
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.commons.mime</artifactId>
@@ -282,7 +288,7 @@
         <dependency>
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.testing.sling-mock-oak</artifactId>
-            <version>2.0.2</version>
+            <version>2.1.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>

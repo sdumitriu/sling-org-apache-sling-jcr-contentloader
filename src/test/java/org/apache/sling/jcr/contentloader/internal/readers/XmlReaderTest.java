@@ -29,8 +29,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.jcr.RepositoryException;
+import javax.jcr.Value;
 
 import org.apache.sling.jcr.contentloader.ContentCreator;
 
@@ -161,6 +163,15 @@ public class XmlReaderTest extends TestCase {
 				String[] grantedPrivileges, String[] deniedPrivileges,
 				String order)
 				throws RepositoryException {
+		}
+
+		/* (non-Javadoc)
+		 * @see org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String, java.lang.String[], java.lang.String[], java.lang.String, java.util.Map, java.util.Map, java.util.Set)
+		 */
+		@Override
+		public void createAce(String principal, String[] grantedPrivileges, String[] deniedPrivileges, String order,
+				Map<String, Value> restrictions, Map<String, Value[]> mvRestrictions,
+				Set<String> removedRestrictionNames) throws RepositoryException {
 		}
 
 		public void createGroup(String name, String[] members,

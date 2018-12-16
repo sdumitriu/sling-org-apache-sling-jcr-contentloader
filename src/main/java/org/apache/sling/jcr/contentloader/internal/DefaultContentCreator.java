@@ -798,6 +798,16 @@ public class DefaultContentCreator implements ContentCreator {
      * @see org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String, java.lang.String, java.lang.String[], java.lang.String[])
 	 */
     public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames, String order) throws RepositoryException {
+    	createAce(principalId, grantedPrivilegeNames, deniedPrivilegeNames, order, null, null, null);
+    }
+
+    /* (non-Javadoc)
+	 * @see org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String, java.lang.String[], java.lang.String[], java.lang.String, java.util.Map, java.util.Map, java.util.Set)
+	 */
+	@Override
+	public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames, String order,
+			Map<String, Value> restrictions, Map<String, Value[]> mvRestrictions, Set<String> removedRestrictionNames)
+			throws RepositoryException {
         final Node parentNode = this.parentNodeStack.peek();
         Session session = parentNode.getSession();
         
@@ -820,11 +830,23 @@ public class DefaultContentCreator implements ContentCreator {
         String resourcePath = parentNode.getPath();
 
         if ((grantedPrivilegeNames != null) || (deniedPrivilegeNames != null)) {
-            AccessControlUtil.replaceAccessControlEntry(session, resourcePath, principal, grantedPrivilegeNames, deniedPrivilegeNames, null, order);
+            AccessControlUtil.replaceAccessControlEntry(session, resourcePath, principal, grantedPrivilegeNames, deniedPrivilegeNames, null, order, 
+            		restrictions, mvRestrictions, removedRestrictionNames);
         }
-    }
+	}
 
-    /**
+	
+	/* (non-Javadoc)
+	 * @see org.apache.sling.jcr.contentloader.ContentCreator#getParent()
+	 */
+	@Override
+	public Node getParent() {
+        final Node parentNode = this.parentNodeStack.peek();
+        return parentNode;
+	}
+
+
+	/**
      * used for the md5
      */
     private static final char[] hexTable = "0123456789abcdef".toCharArray();

@@ -97,6 +97,9 @@ public abstract class ContentloaderTestSupport extends TestSupport {
 
     @Configuration
     public Option[] configuration() {
+    	//workaround to get the required jcr.base bundle into the runtime
+    	SlingOptions.versionResolver.setVersionFromProject("org.apache.sling", "org.apache.sling.jcr.base");
+    	
         CompositeOption quickstart = (CompositeOption) quickstart();
         final Option[] options = Arrays.stream(quickstart.getOptions()).filter(e -> !Objects.deepEquals(e,
             mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"))

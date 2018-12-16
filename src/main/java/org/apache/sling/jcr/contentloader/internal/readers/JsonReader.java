@@ -32,8 +32,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import javax.jcr.Node;
 import javax.jcr.PropertyType;
 import javax.jcr.RepositoryException;
+import javax.jcr.Value;
+import javax.jcr.ValueFactory;
+import javax.jcr.ValueFormatException;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonException;
@@ -41,10 +45,17 @@ import javax.json.JsonNumber;
 import javax.json.JsonObject;
 import javax.json.JsonString;
 import javax.json.JsonValue;
+import javax.json.JsonValue.ValueType;
 
+import org.apache.jackrabbit.oak.spi.security.authorization.restriction.RestrictionDefinition;
+import org.apache.jackrabbit.oak.spi.security.authorization.restriction.RestrictionProvider;
 import org.apache.sling.jcr.contentloader.ContentCreator;
 import org.apache.sling.jcr.contentloader.ContentReader;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
+import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.ServiceReference;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -464,8 +475,146 @@ public class JsonReader implements ContentReader {
 		}
 
 		String order = ace.getString("order", null);
+		
+		Map<String, Value> restrictionsMap = null;
+		Map<String, Value[]> mvRestrictionsMap = null;
+		Set<String> removedRestrictionNames = null;
+		JsonObject restrictions = (JsonObject) ace.get("restrictions");
+		if (restrictions != null) {
+			//lazy initialized map for quick lookup when processing restrictions
+			Map<String, RestrictionDefinition> supportedRestrictionsMap = new HashMap<>();
+
+			Node parentNode = contentCreator.getParent();
+
+			RestrictionProvider restrictionProvider = null;
+			Bundle bundle = FrameworkUtil.getBundle(getClass());
+			BundleContext bundleContext = bundle.getBundleContext();
+			ServiceReference<RestrictionProvider> serviceReference = null;
+			try {
+				serviceReference = bundleContext.getServiceReference(RestrictionProvider.class);
+				restrictionProvider = bundleContext.getService(serviceReference);
+				
+				if (restrictionProvider == null) {
+					throw new JsonException("No restriction provider is available so unable to process restriction values");
+				}
+
+				// populate the map
+				Set<RestrictionDefinition> supportedRestrictions = restrictionProvider.getSupportedRestrictions(parentNode.getPath());
+				for (RestrictionDefinition restrictionDefinition : supportedRestrictions) {
+					supportedRestrictionsMap.put(restrictionDefinition.getName(), restrictionDefinition);
+				}
+			} finally {
+				if (serviceReference != null) {
+					bundleContext.ungetService(serviceReference);
+				}
+			}
+			
+			restrictionsMap = new HashMap<>();
+			mvRestrictionsMap = new HashMap<>();
+			removedRestrictionNames = new HashSet<>();
+
+			ValueFactory factory = parentNode.getSession().getValueFactory();
+			
+			Set<String> keySet = restrictions.keySet();
+			for (String rname : keySet) {
+				if (rname.endsWith("@Delete")) {
+					//add the key to the 'remove' set.  the value doesn't matter and is ignored.
+					String rname2 = rname.substring(9, rname.length() - 7);
+					removedRestrictionNames.add(rname2);
+				} else {
+					RestrictionDefinition rd = supportedRestrictionsMap.get(rname);
+					if (rd == null) {
+						//illegal restriction name?
+						throw new JsonException("Invalid or not supported restriction name was supplied: " + rname);
+					}
+					
+					boolean multival = rd.getRequiredType().isArray();
+					int restrictionType = rd.getRequiredType().tag();
+
+					//read the requested restriction value and apply it
+					JsonValue jsonValue = restrictions.get(rname);
+
+					if (multival) {
+						if (jsonValue.getValueType() == ValueType.ARRAY) {
+							JsonArray jsonArray = (JsonArray)jsonValue;
+							int size = jsonArray.size();
+							Value [] values = new Value[size];
+							for (int i = 0; i < size; i++) {
+								values[i] = toValue(factory, jsonArray.get(i), restrictionType);
+							}
+							mvRestrictionsMap.put(rname, values);
+						} else {
+							Value v = toValue(factory, jsonValue, restrictionType);
+							mvRestrictionsMap.put(rname, new Value[] {v});
+						}
+					} else {
+						if (jsonValue.getValueType() == ValueType.ARRAY) {
+							JsonArray jsonArray = (JsonArray)jsonValue;
+							int size = jsonArray.size();
+							if (size == 1) {
+								Value v = toValue(factory, jsonArray.get(0), restrictionType);
+								restrictionsMap.put(rname, v);
+							} else if (size > 1) {
+			    				throw new JsonException("Unexpected multi value array data found for single-value restriction value for name: " + rname);
+							}
+						} else {
+							Value v = toValue(factory, jsonValue, restrictionType);
+							restrictionsMap.put(rname, v);
+						}
+					}
+				}
+			}
+		}
 
 		//do the work.
-		contentCreator.createAce(principalID, grantedPrivileges, deniedPrivileges, order);
+		if (restrictionsMap == null && mvRestrictionsMap == null && removedRestrictionNames == null) {
+			contentCreator.createAce(principalID, grantedPrivileges, deniedPrivileges, order);
+		} else {
+			contentCreator.createAce(principalID, grantedPrivileges, deniedPrivileges, order, restrictionsMap, mvRestrictionsMap, 
+					removedRestrictionNames == null ? null : removedRestrictionNames);
+		}
+    }
+    
+    /**
+     * Attempt to convert the JsonValue to the equivalent JCR Value object
+     * 
+     * @param factory the JCR value factory
+     * @param jsonValue the JSON value to convert
+     * @param restrictionType a hint for the expected property type of the value
+     * @return the Value if converted or null otherwise
+     * @throws ValueFormatException 
+     */
+    private Value toValue(ValueFactory factory, JsonValue jsonValue, int restrictionType) throws ValueFormatException {
+    	Value value = null;
+		ValueType valueType = jsonValue.getValueType();
+		switch (valueType) {
+		case TRUE:
+			value = factory.createValue(false);
+			break;
+		case FALSE:
+			value = factory.createValue(false);
+			break;
+		case NUMBER:
+			JsonNumber jsonNumber = (JsonNumber)jsonValue;
+			if (jsonNumber.isIntegral()) {
+				value = factory.createValue(jsonNumber.longValue());
+			} else {
+				value = factory.createValue(jsonNumber.doubleValue());
+			}
+			break;
+		case STRING:
+			value = factory.createValue(((JsonString)jsonValue).getString(), restrictionType);
+			break;
+		case NULL:
+			value = null;
+			break;
+		case ARRAY:
+		case OBJECT:
+		default:
+			//illegal JSON?
+			break;
+		}
+    	
+    	return value;
     }
 }
