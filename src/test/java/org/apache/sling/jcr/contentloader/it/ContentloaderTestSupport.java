@@ -18,11 +18,21 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
+import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
+import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
+import static org.ops4j.pax.exam.CoreOptions.junitBundles;
+import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 import javax.jcr.Session;
@@ -43,14 +53,6 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
-import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.ops4j.pax.exam.CoreOptions.junitBundles;
-import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
-import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
 
 public abstract class ContentloaderTestSupport extends TestSupport {
 
@@ -88,6 +90,28 @@ public abstract class ContentloaderTestSupport extends TestSupport {
             final Bundle bundle = bundleContext.installBundle(bundleSymbolicName, is);
             bundle.start();
         }
+        
+		// stabilize the downstream assertions by waiting a moment for the background content loading 
+        // to be processed.  Retry the checking a few times (if necessary) since the timing is tricky.
+        String contentLoadedPath = String.format("/var/sling/bundle-content/%s", bundleSymbolicName);
+        long timeoutSeconds = 30;
+        long timeout = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSeconds);
+        boolean retry = true;
+        do {
+        	if (session.itemExists(contentLoadedPath)) {
+        		//stop looping
+        		retry = false;
+        	} else {
+        		if (System.currentTimeMillis() > timeout) {
+			        fail("RetryLoop failed, condition is false after " + timeoutSeconds + " seconds: " 
+			                + "A content loaded node expected at " + contentLoadedPath);
+        		} else {
+                    logger.warn("Bundle content not loaded yet, retrying after a short delay, path={}", contentLoadedPath);
+                    Thread.sleep(200);
+                    session.refresh(false);
+        		}        		
+        	}
+        } while (retry);        
     }
 
     @After
