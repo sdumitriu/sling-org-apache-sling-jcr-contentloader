@@ -37,7 +37,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/** Basic test of a bundle that provides initial content */
+/**
+ * Basic test of a bundle that provides initial content
+ */
 @RunWith(PaxExam.class)
 @ExamReactorStrategy(PerClass.class)
 public class I18nInitialContentIT extends ContentloaderTestSupport {
@@ -48,32 +50,32 @@ public class I18nInitialContentIT extends ContentloaderTestSupport {
         addContent(b, DEFAULT_PATH_IN_BUNDLE, "i18n/en.json.xml");
         return b;
     }
-    
+
     @Test
     public void bundleStarted() {
         final Bundle b = findBundle(bundleSymbolicName);
         assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
         assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
     }
-    
+
     @Test
     public void i18nJsonFile() throws RepositoryException {
-        final String filePath = contentRootPath + "/i18n/en.json"; 
-        assertTrue("file node " + filePath + " exists", session.itemExists(filePath)); 
+        final String filePath = contentRootPath + "/i18n/en.json";
+        assertTrue("file node " + filePath + " exists", session.itemExists(filePath));
         Node node = session.getNode(filePath);
         assertEquals("file has node type 'nt:file'", "nt:file", node.getPrimaryNodeType().getName());
-        
+
         boolean mixLanguageFound = false;
         for (NodeType mixin : node.getMixinNodeTypes()) {
             if ("mix:language".equals(mixin.getName())) {
                 mixLanguageFound = true;
             }
         }
-        assertTrue("file has mixin 'mix:language'", mixLanguageFound); 
+        assertTrue("file has mixin 'mix:language'", mixLanguageFound);
         assertEquals("file has property 'en'", "en", node.getProperty("jcr:language").getString());
 
-        final String descriptorPath = contentRootPath + "/i18n/en.json.xml"; 
-        assertFalse("descriptor " + descriptorPath + " does not exists", session.itemExists(descriptorPath)); 
+        final String descriptorPath = contentRootPath + "/i18n/en.json.xml";
+        assertFalse("descriptor " + descriptorPath + " does not exists", session.itemExists(descriptorPath));
     }
 
 }

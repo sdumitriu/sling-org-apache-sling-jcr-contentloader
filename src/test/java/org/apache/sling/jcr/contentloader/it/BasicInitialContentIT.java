@@ -34,7 +34,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/** Basic test of a bundle that provides initial content */
+/**
+ * Basic test of a bundle that provides initial content
+ */
 @RunWith(PaxExam.class)
 @ExamReactorStrategy(PerClass.class)
 public class BasicInitialContentIT extends ContentloaderTestSupport {
@@ -47,41 +49,41 @@ public class BasicInitialContentIT extends ContentloaderTestSupport {
         addContent(b, DEFAULT_PATH_IN_BUNDLE, "folder-with-descriptor/test2.txt");
         return b;
     }
-    
+
     @Test
     public void bundleStarted() {
         final Bundle b = findBundle(bundleSymbolicName);
         assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
         assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
     }
-    
+
     @Test
     public void initialContentInstalled() throws RepositoryException {
-        final String testNodePath = contentRootPath + "/basic-content/test-node"; 
-        assertTrue("Expecting initial content to be installed", session.itemExists(testNodePath)); 
-        assertEquals("Expecting foo=bar", "bar", session.getNode(testNodePath).getProperty("foo").getString()); 
+        final String testNodePath = contentRootPath + "/basic-content/test-node";
+        assertTrue("Expecting initial content to be installed", session.itemExists(testNodePath));
+        assertEquals("Expecting foo=bar", "bar", session.getNode(testNodePath).getProperty("foo").getString());
     }
 
     @Test
     public void folderWithoutDescriptor() throws RepositoryException {
-        final String folderPath = contentRootPath + "/simple-folder"; 
-        assertTrue("folder node " + folderPath + " exists", session.itemExists(folderPath)); 
-        assertEquals("folder has node type 'sling:Folder'", "sling:Folder", session.getNode(folderPath).getPrimaryNodeType().getName()); 
+        final String folderPath = contentRootPath + "/simple-folder";
+        assertTrue("folder node " + folderPath + " exists", session.itemExists(folderPath));
+        assertEquals("folder has node type 'sling:Folder'", "sling:Folder", session.getNode(folderPath).getPrimaryNodeType().getName());
 
-        final String filePath = contentRootPath + "/simple-folder/test1.txt"; 
-        assertTrue("file node " + filePath + " exists", session.itemExists(filePath)); 
-        assertEquals("file has node type 'nt:file'", "nt:file", session.getNode(filePath).getPrimaryNodeType().getName()); 
+        final String filePath = contentRootPath + "/simple-folder/test1.txt";
+        assertTrue("file node " + filePath + " exists", session.itemExists(filePath));
+        assertEquals("file has node type 'nt:file'", "nt:file", session.getNode(filePath).getPrimaryNodeType().getName());
     }
 
     @Test
     public void folderWithDescriptor() throws RepositoryException {
-        final String folderPath = contentRootPath + "/folder-with-descriptor"; 
-        assertTrue("folder node " + folderPath + " exists", session.itemExists(folderPath)); 
-        assertEquals("folder has node type 'sling:OrderedFolder'", "sling:OrderedFolder", session.getNode(folderPath).getPrimaryNodeType().getName()); 
+        final String folderPath = contentRootPath + "/folder-with-descriptor";
+        assertTrue("folder node " + folderPath + " exists", session.itemExists(folderPath));
+        assertEquals("folder has node type 'sling:OrderedFolder'", "sling:OrderedFolder", session.getNode(folderPath).getPrimaryNodeType().getName());
 
-        final String filePath = contentRootPath + "/folder-with-descriptor/test2.txt"; 
-        assertTrue("file node " + filePath + " exists", session.itemExists(filePath)); 
-        assertEquals("file has node type 'nt:file'", "nt:file", session.getNode(filePath).getPrimaryNodeType().getName()); 
+        final String filePath = contentRootPath + "/folder-with-descriptor/test2.txt";
+        assertTrue("file node " + filePath + " exists", session.itemExists(filePath));
+        assertEquals("file has node type 'nt:file'", "nt:file", session.getNode(filePath).getPrimaryNodeType().getName());
     }
 
 }

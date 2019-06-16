@@ -87,28 +87,28 @@ public abstract class ContentloaderTestSupport extends TestSupport {
             final Bundle bundle = bundleContext.installBundle(bundleSymbolicName, is);
             bundle.start();
         }
-        
-		// stabilize the downstream assertions by waiting a moment for the background content loading 
+
+        // stabilize the downstream assertions by waiting a moment for the background content loading
         // to be processed.  Retry the checking a few times (if necessary) since the timing is tricky.
         String contentLoadedPath = String.format("/var/sling/bundle-content/%s", bundleSymbolicName);
         long timeoutSeconds = 30;
         long timeout = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSeconds);
         boolean retry = true;
         do {
-        	if (session.itemExists(contentLoadedPath)) {
-        		//stop looping
-        		retry = false;
-        	} else {
-        		if (System.currentTimeMillis() > timeout) {
-			        fail("RetryLoop failed, condition is false after " + timeoutSeconds + " seconds: " 
-			                + "A content loaded node expected at " + contentLoadedPath);
-        		} else {
+            if (session.itemExists(contentLoadedPath)) {
+                //stop looping
+                retry = false;
+            } else {
+                if (System.currentTimeMillis() > timeout) {
+                    fail("RetryLoop failed, condition is false after " + timeoutSeconds + " seconds: "
+                        + "A content loaded node expected at " + contentLoadedPath);
+                } else {
                     logger.warn("Bundle content not loaded yet, retrying after a short delay, path={}", contentLoadedPath);
                     Thread.sleep(200);
                     session.refresh(false);
-        		}        		
-        	}
-        } while (retry);        
+                }
+            }
+        } while (retry);
     }
 
     @After
