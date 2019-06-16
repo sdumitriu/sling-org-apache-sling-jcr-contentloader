@@ -18,19 +18,8 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
-import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
-import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-import static org.ops4j.pax.exam.CoreOptions.junitBundles;
-import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
-import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -44,8 +33,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.ops4j.pax.exam.Configuration;
 import org.ops4j.pax.exam.Option;
-import org.ops4j.pax.exam.options.CompositeOption;
-import org.ops4j.pax.exam.options.DefaultCompositeOption;
+import org.ops4j.pax.exam.options.ModifiableCompositeOption;
 import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.ops4j.pax.tinybundles.core.TinyBundles;
 import org.osgi.framework.Bundle;
@@ -53,6 +41,15 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
+import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
+import static org.ops4j.pax.exam.CoreOptions.junitBundles;
+import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
 
 public abstract class ContentloaderTestSupport extends TestSupport {
 
@@ -121,14 +118,8 @@ public abstract class ContentloaderTestSupport extends TestSupport {
 
     @Configuration
     public Option[] configuration() {
-    	//workaround to get the required jcr.base bundle into the runtime
-    	SlingOptions.versionResolver.setVersionFromProject("org.apache.sling", "org.apache.sling.jcr.base");
-    	
-        CompositeOption quickstart = (CompositeOption) quickstart();
-        final Option[] options = Arrays.stream(quickstart.getOptions()).filter(e -> !Objects.deepEquals(e,
-            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"))
-        )).toArray(Option[]::new);
-        quickstart = new DefaultCompositeOption(options);
+        final Option contentloader = mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"));
+        final ModifiableCompositeOption quickstart = quickstart().remove(contentloader);
         return new Option[]{
             super.baseConfiguration(),
             quickstart,
@@ -143,12 +134,11 @@ public abstract class ContentloaderTestSupport extends TestSupport {
         };
     }
 
-    protected Option quickstart() {
+    protected ModifiableCompositeOption quickstart() {
         final int httpPort = findFreePort();
         final String workingDirectory = workingDirectory();
         return slingQuickstartOakTar(workingDirectory, httpPort);
     }
-
 
     private InputStream getTestBundleStream() throws Exception {
         final TinyBundle bundle = TinyBundles.bundle().set(Constants.BUNDLE_SYMBOLICNAME, bundleSymbolicName);
