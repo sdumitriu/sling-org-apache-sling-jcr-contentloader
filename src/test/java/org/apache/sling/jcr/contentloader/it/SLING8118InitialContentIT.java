@@ -20,6 +20,7 @@ package org.apache.sling.jcr.contentloader.it;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,6 +36,8 @@ import javax.jcr.security.AccessControlManager;
 import javax.jcr.security.AccessControlPolicy;
 import javax.jcr.security.Privilege;
 
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Multimap;
 import org.apache.jackrabbit.api.security.JackrabbitAccessControlEntry;
 import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.apache.jackrabbit.api.security.user.Group;
@@ -42,10 +45,11 @@ import org.apache.jackrabbit.api.security.user.UserManager;
 import org.apache.sling.jcr.base.util.AccessControlUtil;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.ops4j.pax.exam.Configuration;
+import org.ops4j.pax.exam.Option;
 import org.ops4j.pax.exam.junit.PaxExam;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
-import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.osgi.framework.Bundle;
 
 import static org.junit.Assert.assertEquals;
@@ -59,22 +63,29 @@ import static org.junit.Assert.assertTrue;
 @ExamReactorStrategy(PerClass.class)
 public class SLING8118InitialContentIT extends ContentloaderTestSupport {
 
-    protected TinyBundle setupTestBundle(TinyBundle b) throws IOException {
-        b.set(SLING_INITIAL_CONTENT_HEADER, DEFAULT_PATH_IN_BUNDLE + ";path:=" + contentRootPath);
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "SLING-8118.json");
-        return b;
+    @Configuration
+    public Option[] configuration() throws IOException {
+        final String header = DEFAULT_PATH_IN_BUNDLE + ";path:=" + CONTENT_ROOT_PATH;
+        final Multimap<String, String> content = ImmutableListMultimap.of(
+            DEFAULT_PATH_IN_BUNDLE, "SLING-8118.json"
+        );
+        final Option bundle = buildInitialContentBundle(header, content);
+        return new Option[]{
+            baseConfiguration(),
+            bundle
+        };
     }
 
     @Test
     public void bundleStarted() {
-        final Bundle b = findBundle(bundleSymbolicName);
-        assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
-        assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
+        final Bundle b = findBundle(BUNDLE_SYMBOLICNAME);
+        assertNotNull("Expecting bundle to be found:" + BUNDLE_SYMBOLICNAME, b);
+        assertEquals("Expecting bundle to be active:" + BUNDLE_SYMBOLICNAME, Bundle.ACTIVE, b.getState());
     }
 
     @Test
     public void initialContentInstalled() throws RepositoryException {
-        final String folderPath = contentRootPath + "/SLING-8118";
+        final String folderPath = CONTENT_ROOT_PATH + "/SLING-8118";
         assertTrue("Expecting initial content to be installed", session.itemExists(folderPath));
         assertEquals("folder has node type 'sling:Folder'", "sling:Folder", session.getNode(folderPath).getPrimaryNodeType().getName());
     }
@@ -100,7 +111,7 @@ public class SLING8118InitialContentIT extends ContentloaderTestSupport {
 
     @Test
     public void aceWithRestrictionsCreated() throws RepositoryException {
-        final String folderPath = contentRootPath + "/SLING-8118";
+        final String folderPath = CONTENT_ROOT_PATH + "/SLING-8118";
         assertTrue("Expecting test folder to exist", session.itemExists(folderPath));
 
         AccessControlManager accessControlManager = AccessControlUtil.getAccessControlManager(session);
@@ -109,9 +120,7 @@ public class SLING8118InitialContentIT extends ContentloaderTestSupport {
         for (AccessControlPolicy accessControlPolicy : policies) {
             if (accessControlPolicy instanceof AccessControlList) {
                 AccessControlEntry[] accessControlEntries = ((AccessControlList) accessControlPolicy).getAccessControlEntries();
-                for (AccessControlEntry accessControlEntry : accessControlEntries) {
-                    allEntries.add(accessControlEntry);
-                }
+                allEntries.addAll(Arrays.asList(accessControlEntries));
             }
         }
         assertEquals(3, allEntries.size());

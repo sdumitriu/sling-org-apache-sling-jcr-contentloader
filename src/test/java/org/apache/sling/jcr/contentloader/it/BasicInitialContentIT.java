@@ -22,12 +22,15 @@ import java.io.IOException;
 
 import javax.jcr.RepositoryException;
 
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Multimap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.ops4j.pax.exam.Configuration;
+import org.ops4j.pax.exam.Option;
 import org.ops4j.pax.exam.junit.PaxExam;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
-import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.osgi.framework.Bundle;
 
 import static org.junit.Assert.assertEquals;
@@ -41,47 +44,54 @@ import static org.junit.Assert.assertTrue;
 @ExamReactorStrategy(PerClass.class)
 public class BasicInitialContentIT extends ContentloaderTestSupport {
 
-    protected TinyBundle setupTestBundle(TinyBundle b) throws IOException {
-        b.set(SLING_INITIAL_CONTENT_HEADER, DEFAULT_PATH_IN_BUNDLE + ";path:=" + contentRootPath);
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "basic-content.json");
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "simple-folder/test1.txt");
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "folder-with-descriptor.json");
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "folder-with-descriptor/test2.txt");
-        return b;
+    @Configuration
+    public Option[] configuration() throws IOException {
+        final String header = DEFAULT_PATH_IN_BUNDLE + ";path:=" + CONTENT_ROOT_PATH;
+        final Multimap<String, String> content = ImmutableListMultimap.of(
+            DEFAULT_PATH_IN_BUNDLE, "basic-content.json",
+            DEFAULT_PATH_IN_BUNDLE, "simple-folder/test1.txt",
+            DEFAULT_PATH_IN_BUNDLE, "folder-with-descriptor.json",
+            DEFAULT_PATH_IN_BUNDLE, "folder-with-descriptor/test2.txt"
+        );
+        final Option bundle = buildInitialContentBundle(header, content);
+        return new Option[]{
+            baseConfiguration(),
+            bundle
+        };
     }
 
     @Test
     public void bundleStarted() {
-        final Bundle b = findBundle(bundleSymbolicName);
-        assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
-        assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
+        final Bundle b = findBundle(BUNDLE_SYMBOLICNAME);
+        assertNotNull("Expecting bundle to be found:" + BUNDLE_SYMBOLICNAME, b);
+        assertEquals("Expecting bundle to be active:" + BUNDLE_SYMBOLICNAME, Bundle.ACTIVE, b.getState());
     }
 
     @Test
     public void initialContentInstalled() throws RepositoryException {
-        final String testNodePath = contentRootPath + "/basic-content/test-node";
+        final String testNodePath = CONTENT_ROOT_PATH + "/basic-content/test-node";
         assertTrue("Expecting initial content to be installed", session.itemExists(testNodePath));
         assertEquals("Expecting foo=bar", "bar", session.getNode(testNodePath).getProperty("foo").getString());
     }
 
     @Test
     public void folderWithoutDescriptor() throws RepositoryException {
-        final String folderPath = contentRootPath + "/simple-folder";
+        final String folderPath = CONTENT_ROOT_PATH + "/simple-folder";
         assertTrue("folder node " + folderPath + " exists", session.itemExists(folderPath));
         assertEquals("folder has node type 'sling:Folder'", "sling:Folder", session.getNode(folderPath).getPrimaryNodeType().getName());
 
-        final String filePath = contentRootPath + "/simple-folder/test1.txt";
+        final String filePath = CONTENT_ROOT_PATH + "/simple-folder/test1.txt";
         assertTrue("file node " + filePath + " exists", session.itemExists(filePath));
         assertEquals("file has node type 'nt:file'", "nt:file", session.getNode(filePath).getPrimaryNodeType().getName());
     }
 
     @Test
     public void folderWithDescriptor() throws RepositoryException {
-        final String folderPath = contentRootPath + "/folder-with-descriptor";
+        final String folderPath = CONTENT_ROOT_PATH + "/folder-with-descriptor";
         assertTrue("folder node " + folderPath + " exists", session.itemExists(folderPath));
         assertEquals("folder has node type 'sling:OrderedFolder'", "sling:OrderedFolder", session.getNode(folderPath).getPrimaryNodeType().getName());
 
-        final String filePath = contentRootPath + "/folder-with-descriptor/test2.txt";
+        final String filePath = CONTENT_ROOT_PATH + "/folder-with-descriptor/test2.txt";
         assertTrue("file node " + filePath + " exists", session.itemExists(filePath));
         assertEquals("file has node type 'nt:file'", "nt:file", session.getNode(filePath).getPrimaryNodeType().getName());
     }
