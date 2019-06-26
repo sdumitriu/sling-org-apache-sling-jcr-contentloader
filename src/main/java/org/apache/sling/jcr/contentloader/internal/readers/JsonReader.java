@@ -173,6 +173,7 @@ public class JsonReader implements ContentReader {
             JsonObject json = Json.createReaderFactory(config)
                     .createReader(new StringReader(tickToDoubleQuote(jsonString))).readObject();
             this.createNode(null, json, contentCreator);
+            contentCreator.finish();
         } catch (JsonException je) {
             throw (IOException) new IOException(je.getMessage()).initCause(je);
         }
@@ -230,7 +231,7 @@ public class JsonReader implements ContentReader {
         if (value instanceof JsonArray) {
             // multivalue
             final JsonArray array = (JsonArray) value;
-            if (array.size() > 0) {
+            if (!array.isEmpty()) {
                 final String values[] = new String[array.size()];
                 for (int i = 0; i < values.length; i++) {
                     values[i] = unbox(array.get(i)).toString();
@@ -240,12 +241,12 @@ public class JsonReader implements ContentReader {
             } else {
                 contentCreator.createProperty(getName(name), PropertyType.STRING, new String[0]);
             }
-
         } else if (value instanceof JsonValue) {
             // single value
             value = unbox(value);
-            final int propertyType = getType(name, value);
-            contentCreator.createProperty(getName(name), propertyType, value.toString());
+            if (value != null) {
+                contentCreator.createProperty(getName(name), getType(name, value), value.toString());
+            }
         }
     }
 
@@ -274,6 +275,9 @@ public class JsonReader implements ContentReader {
     }
 
     private int getType(String name, Object object) {
+        if (object == null) {
+            return PropertyType.STRING;
+        }
         if (object instanceof Double || object instanceof Float) {
             return PropertyType.DOUBLE;
         } else if (object instanceof Number) {
