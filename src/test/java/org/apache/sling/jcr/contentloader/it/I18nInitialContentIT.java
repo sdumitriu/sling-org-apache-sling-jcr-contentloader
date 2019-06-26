@@ -24,12 +24,15 @@ import javax.jcr.Node;
 import javax.jcr.RepositoryException;
 import javax.jcr.nodetype.NodeType;
 
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Multimap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.ops4j.pax.exam.Configuration;
+import org.ops4j.pax.exam.Option;
 import org.ops4j.pax.exam.junit.PaxExam;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
-import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.osgi.framework.Bundle;
 
 import static org.junit.Assert.assertEquals;
@@ -37,43 +40,52 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/** Basic test of a bundle that provides initial content */
+/**
+ * Basic test of a bundle that provides I18N initial content
+ */
 @RunWith(PaxExam.class)
 @ExamReactorStrategy(PerClass.class)
 public class I18nInitialContentIT extends ContentloaderTestSupport {
 
-    protected TinyBundle setupTestBundle(TinyBundle b) throws IOException {
-        b.set(SLING_INITIAL_CONTENT_HEADER, DEFAULT_PATH_IN_BUNDLE + ";ignoreImportProviders:=json;path:=" + contentRootPath);
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "i18n/en.json");
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "i18n/en.json.xml");
-        return b;
+    @Configuration
+    public Option[] configuration() throws IOException {
+        final String header = DEFAULT_PATH_IN_BUNDLE + ";ignoreImportProviders:=json;path:=" + CONTENT_ROOT_PATH;
+        final Multimap<String, String> content = ImmutableListMultimap.of(
+            DEFAULT_PATH_IN_BUNDLE, "i18n/en.json",
+            DEFAULT_PATH_IN_BUNDLE, "i18n/en.json.xml"
+        );
+        final Option bundle = buildInitialContentBundle(header, content);
+        return new Option[]{
+            baseConfiguration(),
+            bundle
+        };
     }
-    
+
     @Test
     public void bundleStarted() {
-        final Bundle b = findBundle(bundleSymbolicName);
-        assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
-        assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
+        final Bundle b = findBundle(BUNDLE_SYMBOLICNAME);
+        assertNotNull("Expecting bundle to be found:" + BUNDLE_SYMBOLICNAME, b);
+        assertEquals("Expecting bundle to be active:" + BUNDLE_SYMBOLICNAME, Bundle.ACTIVE, b.getState());
     }
-    
+
     @Test
     public void i18nJsonFile() throws RepositoryException {
-        final String filePath = contentRootPath + "/i18n/en.json"; 
-        assertTrue("file node " + filePath + " exists", session.itemExists(filePath)); 
+        final String filePath = CONTENT_ROOT_PATH + "/i18n/en.json";
+        assertTrue("file node " + filePath + " exists", session.itemExists(filePath));
         Node node = session.getNode(filePath);
         assertEquals("file has node type 'nt:file'", "nt:file", node.getPrimaryNodeType().getName());
-        
+
         boolean mixLanguageFound = false;
         for (NodeType mixin : node.getMixinNodeTypes()) {
             if ("mix:language".equals(mixin.getName())) {
                 mixLanguageFound = true;
             }
         }
-        assertTrue("file has mixin 'mix:language'", mixLanguageFound); 
+        assertTrue("file has mixin 'mix:language'", mixLanguageFound);
         assertEquals("file has property 'en'", "en", node.getProperty("jcr:language").getString());
 
-        final String descriptorPath = contentRootPath + "/i18n/en.json.xml"; 
-        assertFalse("descriptor " + descriptorPath + " does not exists", session.itemExists(descriptorPath)); 
+        final String descriptorPath = CONTENT_ROOT_PATH + "/i18n/en.json.xml";
+        assertFalse("descriptor " + descriptorPath + " does not exists", session.itemExists(descriptorPath));
     }
 
 }

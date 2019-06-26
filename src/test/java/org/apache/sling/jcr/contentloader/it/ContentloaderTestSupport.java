@@ -18,34 +18,24 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
-import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
-import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
-import static org.ops4j.pax.exam.CoreOptions.junitBundles;
-import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
-import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
-
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 import javax.inject.Inject;
+import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 
+import com.google.common.collect.Multimap;
 import org.apache.sling.jcr.api.SlingRepository;
+import org.apache.sling.resource.presence.ResourcePresence;
 import org.apache.sling.testing.paxexam.SlingOptions;
 import org.apache.sling.testing.paxexam.TestSupport;
 import org.junit.After;
 import org.junit.Before;
-import org.ops4j.pax.exam.Configuration;
 import org.ops4j.pax.exam.Option;
-import org.ops4j.pax.exam.options.CompositeOption;
-import org.ops4j.pax.exam.options.DefaultCompositeOption;
+import org.ops4j.pax.exam.options.ModifiableCompositeOption;
+import org.ops4j.pax.exam.util.Filter;
 import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.ops4j.pax.tinybundles.core.TinyBundles;
 import org.osgi.framework.Bundle;
@@ -53,6 +43,19 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
+import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.ops4j.pax.exam.CoreOptions.composite;
+import static org.ops4j.pax.exam.CoreOptions.junitBundles;
+import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
+import static org.ops4j.pax.exam.CoreOptions.streamBundle;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.factoryConfiguration;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
+import static org.ops4j.pax.tinybundles.core.TinyBundles.withBnd;
 
 public abstract class ContentloaderTestSupport extends TestSupport {
 
@@ -64,54 +67,52 @@ public abstract class ContentloaderTestSupport extends TestSupport {
 
     protected Session session;
 
-    protected String bundleSymbolicName;
-
-    protected String contentRootPath;
-
     protected static final String SLING_INITIAL_CONTENT_HEADER = "Sling-Initial-Content";
 
+    protected static final String BUNDLE_SYMBOLICNAME = "TEST-CONTENT-BUNDLE";
+
     protected static final String DEFAULT_PATH_IN_BUNDLE = "test-initial-content";
+
+    protected static final String CONTENT_ROOT_PATH = "/test-content/" + BUNDLE_SYMBOLICNAME;
 
     private final Logger logger = LoggerFactory.getLogger(ContentloaderTestSupport.class);
 
     ContentloaderTestSupport() {
     }
 
+    @Inject
+    @Filter(value = "(path=" + CONTENT_ROOT_PATH + ")")
+    private ResourcePresence resourcePresence;
+
+    public ModifiableCompositeOption baseConfiguration() {
+        final Option contentloader = mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"));
+        final ModifiableCompositeOption quickstart = quickstart().remove(contentloader);
+        return composite(
+            super.baseConfiguration(),
+            quickstart,
+            // Sling JCR ContentLoader
+            testBundle("bundle.filename"),
+            factoryConfiguration("org.apache.sling.resource.presence.internal.ResourcePresenter")
+                .put("path", CONTENT_ROOT_PATH)
+                .asOption(),
+            // testing
+            newConfiguration("org.apache.sling.jcr.base.internal.LoginAdminWhitelist")
+                .put("whitelist.bundles.regexp", "PAXEXAM-PROBE-.*")
+                .asOption(),
+            slingResourcePresence(),
+            junitBundles()
+        );
+    }
+
+    protected ModifiableCompositeOption quickstart() {
+        final int httpPort = findFreePort();
+        final String workingDirectory = workingDirectory();
+        return slingQuickstartOakTar(workingDirectory, httpPort);
+    }
+
     @Before
     public void setup() throws Exception {
-        bundleSymbolicName = "TEST-" + UUID.randomUUID();
-        contentRootPath = "/test-content/" + bundleSymbolicName;
         session = repository.loginAdministrative(null);
-
-        assertFalse("Expecting no content before test", session.itemExists(contentRootPath));
-
-        // Create, install and start a bundle that has initial content
-        try (InputStream is = getTestBundleStream()) {
-            final Bundle bundle = bundleContext.installBundle(bundleSymbolicName, is);
-            bundle.start();
-        }
-        
-		// stabilize the downstream assertions by waiting a moment for the background content loading 
-        // to be processed.  Retry the checking a few times (if necessary) since the timing is tricky.
-        String contentLoadedPath = String.format("/var/sling/bundle-content/%s", bundleSymbolicName);
-        long timeoutSeconds = 30;
-        long timeout = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSeconds);
-        boolean retry = true;
-        do {
-        	if (session.itemExists(contentLoadedPath)) {
-        		//stop looping
-        		retry = false;
-        	} else {
-        		if (System.currentTimeMillis() > timeout) {
-			        fail("RetryLoop failed, condition is false after " + timeoutSeconds + " seconds: " 
-			                + "A content loaded node expected at " + contentLoadedPath);
-        		} else {
-                    logger.warn("Bundle content not loaded yet, retrying after a short delay, path={}", contentLoadedPath);
-                    Thread.sleep(200);
-                    session.refresh(false);
-        		}        		
-        	}
-        } while (retry);        
     }
 
     @After
@@ -119,55 +120,29 @@ public abstract class ContentloaderTestSupport extends TestSupport {
         session.logout();
     }
 
-    @Configuration
-    public Option[] configuration() {
-    	//workaround to get the required jcr.base bundle into the runtime
-    	SlingOptions.versionResolver.setVersionFromProject("org.apache.sling", "org.apache.sling.jcr.base");
-    	
-        CompositeOption quickstart = (CompositeOption) quickstart();
-        final Option[] options = Arrays.stream(quickstart.getOptions()).filter(e -> !Objects.deepEquals(e,
-            mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"))
-        )).toArray(Option[]::new);
-        quickstart = new DefaultCompositeOption(options);
-        return new Option[]{
-            super.baseConfiguration(),
-            quickstart,
-            // Sling JCR ContentLoader
-            testBundle("bundle.filename"),
-            // testing
-            newConfiguration("org.apache.sling.jcr.base.internal.LoginAdminWhitelist")
-                .put("whitelist.bundles.regexp", "PAXEXAM-PROBE-.*")
-                .asOption(),
-            slingResourcePresence(),
-            junitBundles()
-        };
-    }
-
-    protected Option quickstart() {
-        final int httpPort = findFreePort();
-        final String workingDirectory = workingDirectory();
-        return slingQuickstartOakTar(workingDirectory, httpPort);
-    }
-
-
-    private InputStream getTestBundleStream() throws Exception {
-        final TinyBundle bundle = TinyBundles.bundle().set(Constants.BUNDLE_SYMBOLICNAME, bundleSymbolicName);
-        return setupTestBundle(bundle).build(TinyBundles.withBnd());
-    }
-
-    abstract protected TinyBundle setupTestBundle(TinyBundle b) throws Exception;
-
     /**
      * Add content to our test bundle
      */
-    protected void addContent(TinyBundle b, String pathInBundle, String resourcePath) throws IOException {
+    protected void addContent(final TinyBundle bundle, String pathInBundle, String resourcePath) throws IOException {
         pathInBundle += "/" + resourcePath;
         resourcePath = "/initial-content/" + resourcePath;
         try (final InputStream is = getClass().getResourceAsStream(resourcePath)) {
             assertNotNull("Expecting resource to be found:" + resourcePath, is);
             logger.info("Adding resource to bundle, path={}, resource={}", pathInBundle, resourcePath);
-            b.add(pathInBundle, is);
+            bundle.add(pathInBundle, is);
         }
+    }
+
+    protected Option buildInitialContentBundle(final String header, final Multimap<String, String> content) throws IOException {
+        final TinyBundle bundle = TinyBundles.bundle();
+        bundle.set(Constants.BUNDLE_SYMBOLICNAME, BUNDLE_SYMBOLICNAME);
+        bundle.set(SLING_INITIAL_CONTENT_HEADER, header);
+        for (final Map.Entry<String, String> entry : content.entries()) {
+            addContent(bundle, entry.getKey(), entry.getValue());
+        }
+        return streamBundle(
+            bundle.build(withBnd())
+        ).start();
     }
 
     protected Bundle findBundle(final String symbolicName) {
@@ -177,6 +152,12 @@ public abstract class ContentloaderTestSupport extends TestSupport {
             }
         }
         return null;
+    }
+
+    protected void assertProperty(final Session session, final String path, final String expected) throws RepositoryException {
+        assertTrue("Expecting property " + path, session.itemExists(path));
+        final String actual = session.getProperty(path).getString();
+        assertEquals("Expecting correct value at " + path, expected, actual);
     }
 
 }

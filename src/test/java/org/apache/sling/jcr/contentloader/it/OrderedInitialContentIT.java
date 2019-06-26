@@ -21,47 +21,52 @@ package org.apache.sling.jcr.contentloader.it;
 import java.io.IOException;
 
 import javax.jcr.RepositoryException;
-import javax.jcr.Session;
 
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Multimap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.ops4j.pax.exam.Configuration;
+import org.ops4j.pax.exam.Option;
 import org.ops4j.pax.exam.junit.PaxExam;
 import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
-import org.ops4j.pax.tinybundles.core.TinyBundle;
 import org.osgi.framework.Bundle;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
-/** Test the SLING-5682 ordered content loading */
+/**
+ * Test the SLING-5682 ordered content loading
+ */
 @RunWith(PaxExam.class)
 @ExamReactorStrategy(PerClass.class)
 public class OrderedInitialContentIT extends ContentloaderTestSupport {
 
-    protected TinyBundle setupTestBundle(TinyBundle b) throws IOException {
-        b.set(SLING_INITIAL_CONTENT_HEADER, DEFAULT_PATH_IN_BUNDLE + ";path:=" + contentRootPath);
-        addContent(b, DEFAULT_PATH_IN_BUNDLE, "ordered-content.ordered-json");
-        return b;
+    @Configuration
+    public Option[] configuration() throws IOException {
+        final String header = DEFAULT_PATH_IN_BUNDLE + ";path:=" + CONTENT_ROOT_PATH;
+        final Multimap<String, String> content = ImmutableListMultimap.of(
+            DEFAULT_PATH_IN_BUNDLE, "ordered-content.ordered-json"
+        );
+        final Option bundle = buildInitialContentBundle(header, content);
+        return new Option[]{
+            baseConfiguration(),
+            bundle
+        };
     }
-    
+
     @Test
     public void bundleStarted() {
-        final Bundle b = findBundle(bundleSymbolicName);
-        assertNotNull("Expecting bundle to be found:" + bundleSymbolicName, b);
-        assertEquals("Expecting bundle to be active:" + bundleSymbolicName, Bundle.ACTIVE, b.getState());
+        final Bundle b = findBundle(BUNDLE_SYMBOLICNAME);
+        assertNotNull("Expecting bundle to be found:" + BUNDLE_SYMBOLICNAME, b);
+        assertEquals("Expecting bundle to be active:" + BUNDLE_SYMBOLICNAME, Bundle.ACTIVE, b.getState());
     }
-    
-    private void assertProperty(Session session, String path, String expected) throws RepositoryException {
-        assertTrue("Expecting property " + path, session.itemExists(path));
-        final String actual = session.getProperty(path).getString();
-        assertEquals("Expecting correct value at " + path, expected, actual);
-    }
-    
+
     @Test
     public void initialContentInstalled() throws RepositoryException {
-        assertProperty(session, contentRootPath + "/ordered-content/first/title", "This comes first"); 
-        assertProperty(session, contentRootPath + "/ordered-content/second/title", "This comes second"); 
+        assertProperty(session, CONTENT_ROOT_PATH + "/ordered-content/first/title", "This comes first");
+        assertProperty(session, CONTENT_ROOT_PATH + "/ordered-content/second/title", "This comes second");
     }
+
 }
