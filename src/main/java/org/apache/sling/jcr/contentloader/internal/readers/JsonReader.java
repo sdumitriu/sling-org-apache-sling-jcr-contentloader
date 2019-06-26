@@ -163,15 +163,14 @@ public class JsonReader implements ContentReader {
 
     @Override
     public void parse(InputStream ins, ContentCreator contentCreator) throws IOException, RepositoryException {
-        try {
-            String jsonString = toString(ins).trim();
-            if (!jsonString.startsWith("{")) {
-                jsonString = "{" + jsonString + "}";
-            }
-            Map<String, Object> config = new HashMap<>();
-            config.put("org.apache.johnzon.supports-comments", true);
-            JsonObject json = Json.createReaderFactory(config)
-                    .createReader(new StringReader(tickToDoubleQuote(jsonString))).readObject();
+        String jsonString = toString(ins).trim();
+        if (!jsonString.startsWith("{")) {
+            jsonString = "{" + jsonString + "}";
+        }
+        Map<String, Object> config = new HashMap<>();
+        config.put("org.apache.johnzon.supports-comments", true);
+        try (javax.json.JsonReader reader = Json.createReaderFactory(config).createReader(new StringReader(tickToDoubleQuote(jsonString)))) {
+            JsonObject json = reader.readObject();
             this.createNode(null, json, contentCreator);
             contentCreator.finish();
         } catch (JsonException je) {
