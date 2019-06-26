@@ -57,6 +57,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * test of a bundle that provides initial content that creates a user/group and defines an ace
  * for those principals within the same transaction
+
  */
 @RunWith(PaxExam.class)
 @ExamReactorStrategy(PerClass.class)

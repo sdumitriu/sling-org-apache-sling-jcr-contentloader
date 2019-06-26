@@ -23,22 +23,30 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
+import java.util.Deque;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.Stack;
 import java.util.StringTokenizer;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 import javax.jcr.Binary;
 import javax.jcr.Item;
 import javax.jcr.ItemNotFoundException;
 import javax.jcr.Node;
+import javax.jcr.NodeIterator;
+import javax.jcr.Property;
+import javax.jcr.PropertyIterator;
 import javax.jcr.PropertyType;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
@@ -67,23 +75,25 @@ import org.slf4j.LoggerFactory;
  */
 public class DefaultContentCreator implements ContentCreator {
 
+    private static final String JCR_LAST_MODIFIED = "jcr:lastModified";
+
     final Logger log = LoggerFactory.getLogger(DefaultContentCreator.class);
 
     private ImportOptions configuration;
 
-    private final Stack<Node> parentNodeStack = new Stack<Node>();
+    private final Deque<Node> parentNodeStack = new ArrayDeque<>();
 
     /**
      * The list of versionables.
      */
-    private final List<Node> versionables = new ArrayList<Node>();
+    private final List<Node> versionables = new ArrayList<>();
 
     /**
      * Delayed references during content loading for the reference property.
      */
-    private final Map<String, List<String>> delayedReferences = new HashMap<String, List<String>>();
+    private final Map<String, List<String>> delayedReferences = new HashMap<>();
 
-    private final Map<String, String[]> delayedMultipleReferences = new HashMap<String, String[]>();
+    private final Map<String, String[]> delayedMultipleReferences = new HashMap<>();
 
     private String defaultName;
 
@@ -116,20 +126,25 @@ public class DefaultContentCreator implements ContentCreator {
      */
     private ContentImportListener importListener;
 
+    private Set<String> appliedSet = new LinkedHashSet<>();
+    private Set<String> importedNodes = new LinkedHashSet<>();
+
     /**
      * A one time use seed to randomize the user location.
      */
     private static final long INSTANCE_SEED = System.currentTimeMillis();
 
     /**
-     * The number of levels folder used to store a user, could be a configuration option.
+     * The number of levels folder used to store a user, could be a configuration
+     * option.
      */
     private static final int STORAGE_LEVELS = 3;
 
     /**
      * Constructor.
      *
-     * @param contentHelper Helper class to get the mime type of a file
+     * @param contentHelper
+     *            Helper class to get the mime type of a file
      */
     public DefaultContentCreator(ContentHelper contentHelper) {
         this.contentHelper = contentHelper;
@@ -138,21 +153,23 @@ public class DefaultContentCreator implements ContentCreator {
     /**
      * Initialize this component.
      *
-     * @param pathEntry              The configuration for this import.
-     * @param defaultContentReaders  List of all content readers.
-     * @param createdNodes           Optional list to store new nodes (for uninstall)
+     * @param options
+     *            The configuration for this import.
+     * @param defaultContentReaders
+     *            List of all content readers.
+     * @param createdNodes
+     *            Optional list to store new nodes (for uninstall)
      */
-    public void init(final ImportOptions pathEntry, final Map<String, ContentReader> defaultContentReaders, final List<String> createdNodes, final ContentImportListener importListener) {
-        this.configuration = pathEntry;
+    public void init(final ImportOptions options, final Map<String, ContentReader> defaultContentReaders,
+            final List<String> createdNodes, final ContentImportListener importListener) {
+        this.configuration = options;
         // create list of allowed content readers
-        this.contentReaders = new HashMap<String, ContentReader>();
-        final Iterator<Map.Entry<String, ContentReader>> entryIter = defaultContentReaders.entrySet().iterator();
-        while (entryIter.hasNext()) {
-            final Map.Entry<String, ContentReader> current = entryIter.next();
-            if (!configuration.isIgnoredImportProvider(current.getKey())) {
-                contentReaders.put(current.getKey(), current.getValue());
+        this.contentReaders = new HashMap<>();
+        defaultContentReaders.forEach((key,value)->{
+            if (!configuration.isIgnoredImportProvider(key)) {
+                contentReaders.put(key, value);
             }
-        }
+        });
         this.createdNodes = createdNodes;
         this.importListener = importListener;
     }
@@ -211,7 +228,8 @@ public class DefaultContentCreator implements ContentCreator {
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createNode(java.lang.String, java.lang.String, java.lang.String[])
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createNode(java.lang.String,
+     *      java.lang.String, java.lang.String[])
      */
     public void createNode(String name, String primaryNodeType, String[] mixinNodeTypes) throws RepositoryException {
         final Node parentNode = this.parentNodeStack.peek();
@@ -223,7 +241,8 @@ public class DefaultContentCreator implements ContentCreator {
             name = this.defaultName;
         }
 
-        // if we are in parent node import mode, we don't create the root top level node!
+        // if we are in parent node import mode, we don't create the root top level
+        // node!
         if (!isParentImport || this.parentNodeStack.size() > 1) {
             // if node already exists but should be overwritten, delete it
             if (!this.ignoreOverwriteFlag && this.configuration.isOverwrite() && parentNode.hasNode(name)) {
@@ -262,7 +281,9 @@ public class DefaultContentCreator implements ContentCreator {
                     }
                 }
             }
-
+            
+            importedNodes.add(node.getPath());
+            
             // check if node is versionable
             final boolean addToVersionables = this.configuration.isCheckin() && node.isNodeType("mix:versionable");
             if (addToVersionables) {
@@ -277,11 +298,14 @@ public class DefaultContentCreator implements ContentCreator {
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String, int, java.lang.String)
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String,
+     *      int, java.lang.String)
      */
     public void createProperty(String name, int propertyType, String value) throws RepositoryException {
+        appliedSet.add(name);
         final Node node = this.parentNodeStack.peek();
-        // check if the property already exists and isPropertyOverwrite() is false, don't overwrite it in this case
+        // check if the property already exists and isPropertyOverwrite() is false,
+        // don't overwrite it in this case
         if (node.hasProperty(name) && !this.configuration.isPropertyOverwrite() && !node.getProperty(name).isNew()) {
             return;
         }
@@ -300,11 +324,9 @@ public class DefaultContentCreator implements ContentCreator {
         } else if ("jcr:isCheckedOut".equals(name)) {
             // don't try to write the property but record its state
             // for later checkin if set to false
-            final boolean checkedout = Boolean.valueOf(value);
-            if (!checkedout) {
-                if (!this.versionables.contains(node)) {
-                    this.versionables.add(node);
-                }
+            final boolean checkedout = Boolean.parseBoolean(value);
+            if (!checkedout && !this.versionables.contains(node)) {
+                this.versionables.add(node);
             }
         } else if (propertyType == PropertyType.DATE) {
             checkoutIfNecessary(node);
@@ -326,11 +348,14 @@ public class DefaultContentCreator implements ContentCreator {
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String, int, java.lang.String[])
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String,
+     *      int, java.lang.String[])
      */
     public void createProperty(String name, int propertyType, String[] values) throws RepositoryException {
+        appliedSet.add(name);
         final Node node = this.parentNodeStack.peek();
-        // check if the property already exists and isPropertyOverwrite() is false, don't overwrite it in this case
+        // check if the property already exists and isPropertyOverwrite() is false,
+        // don't overwrite it in this case
         if (node.hasProperty(name) && !this.configuration.isPropertyOverwrite() && !node.getProperty(name).isNew()) {
             return;
         }
@@ -342,7 +367,8 @@ public class DefaultContentCreator implements ContentCreator {
             for (int i = 0; i < values.length; i++) {
                 uuids[i] = getUUID(node.getSession(), propPath, getAbsPath(node, values[i]));
                 uuidOrPaths[i] = uuids[i] != null ? uuids[i] : getAbsPath(node, values[i]);
-                if (uuids[i] == null) hasAll = false;
+                if (uuids[i] == null)
+                    hasAll = false;
             }
             checkoutIfNecessary(node);
             node.setProperty(name, uuids, propertyType);
@@ -354,7 +380,7 @@ public class DefaultContentCreator implements ContentCreator {
             }
         } else if (propertyType == PropertyType.DATE) {
             checkoutIfNecessary(node);
-            
+
             // This modification is to remove the colon in the JSON Timezone
             ValueFactory valueFactory = node.getSession().getValueFactory();
             Value[] jcrValues = new Value[values.length];
@@ -364,7 +390,7 @@ public class DefaultContentCreator implements ContentCreator {
             }
 
             node.setProperty(name, jcrValues, propertyType);
-            
+
             if (this.importListener != null) {
                 this.importListener.onCreate(node.getProperty(name).getPath());
             }
@@ -398,22 +424,24 @@ public class DefaultContentCreator implements ContentCreator {
         } else if (value instanceof Boolean) {
             return factory.createValue((Boolean) value);
         } else if (value instanceof InputStream) {
-        	Binary binary = factory.createBinary((InputStream)value);
-        	return factory.createValue(binary);
+            Binary binary = factory.createBinary((InputStream) value);
+            return factory.createValue(binary);
         } else {
             return factory.createValue(value.toString());
         }
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String, java.lang.Object)
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String,
+     *      java.lang.Object)
      */
     public void createProperty(String name, Object value) throws RepositoryException {
         createProperty(name, value, false);
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String, java.lang.Object[])
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String,
+     *      java.lang.Object[])
      */
     public void createProperty(String name, Object[] values) throws RepositoryException {
         createProperty(name, values, false);
@@ -424,8 +452,30 @@ public class DefaultContentCreator implements ContentCreator {
      */
     public void finishNode() throws RepositoryException {
         final Node node = this.parentNodeStack.pop();
+        cleanUpNode(node);
         // resolve REFERENCE property values pointing to this node
         resolveReferences(node);
+        node.getSession().save();
+    }
+
+    private void cleanUpNode(Node node) throws RepositoryException {
+        if (configuration.isPropertyMerge()) {
+            PropertyIterator it = node.getProperties();
+            while (it.hasNext()) {
+                Property prop= it.nextProperty();
+                String propertyName = prop.getName();
+                if (appliedSet.contains(propertyName)) {
+                    continue;
+                }
+                if (!prop.getDefinition().isProtected()) {
+                    if (importListener != null) {
+                        importListener.onDelete(prop.getPath());
+                    }
+                    prop.remove();
+                    log.trace(propertyName);
+                }
+            }
+        }
     }
 
     private void addNodeToCreatedList(Node node) throws RepositoryException {
@@ -462,21 +512,16 @@ public class DefaultContentCreator implements ContentCreator {
             }
         } else {
             // not existing yet, keep for delayed setting
-            List<String> current = delayedReferences.get(referencePath);
-            if (current == null) {
-                current = new ArrayList<String>();
-                delayedReferences.put(referencePath, current);
-            }
+            List<String> current = delayedReferences.computeIfAbsent(referencePath, k -> new ArrayList<>());
             current.add(propPath);
         }
-
         // no UUID found
         return null;
     }
 
     private void resolveReferences(Node node) throws RepositoryException {
         List<String> props = delayedReferences.remove(node.getPath());
-        if (props == null || props.size() == 0) {
+        if (props == null || props.isEmpty()) {
             return;
         }
 
@@ -529,17 +574,16 @@ public class DefaultContentCreator implements ContentCreator {
     }
 
     /**
-     * Gets the name part of the <code>path</code>. The name is
-     * the part of the path after the last slash (or the complete path if no
-     * slash is contained).
+     * Gets the name part of the <code>path</code>. The name is the part of the path
+     * after the last slash (or the complete path if no slash is contained).
      *
-     * @param path The path from which to extract the name part.
+     * @param path
+     *            The path from which to extract the name part.
      * @return The name part.
      */
     private String getName(String path) {
         int lastSlash = path.lastIndexOf('/');
-        String name = (lastSlash < 0) ? path : path.substring(lastSlash + 1);
-        return name;
+        return lastSlash < 0 ? path : path.substring(lastSlash + 1);
     }
 
     private Node getParentNode(Session session, String path) throws RepositoryException {
@@ -588,6 +632,7 @@ public class DefaultContentCreator implements ContentCreator {
                 this.importListener.onModify(node.getProperty(name).getPath());
             }
         }
+        appliedSet.add(name);
     }
 
     private void createProperty(String name, Object[] values, boolean overwriteExisting) throws RepositoryException {
@@ -616,12 +661,15 @@ public class DefaultContentCreator implements ContentCreator {
                 this.importListener.onModify(node.getProperty(name).getPath());
             }
         }
+        appliedSet.add(name);
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createFileAndResourceNode(java.lang.String, java.io.InputStream, java.lang.String, long)
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createFileAndResourceNode(java.lang.String,
+     *      java.io.InputStream, java.lang.String, long)
      */
-    public void createFileAndResourceNode(String name, InputStream data, String mimeType, long lastModified) throws RepositoryException {
+    public void createFileAndResourceNode(String name, InputStream data, String mimeType, long lastModified)
+            throws RepositoryException {
         int lastSlash = name.lastIndexOf('/');
         name = (lastSlash < 0) ? name : name.substring(lastSlash + 1);
         final Node parentNode = this.parentNodeStack.peek();
@@ -632,13 +680,14 @@ public class DefaultContentCreator implements ContentCreator {
             Node contentNode = parentNode.getNode(name).getNode("jcr:content");
             this.parentNodeStack.push(contentNode);
             long nodeLastModified = 0L;
-            if (contentNode.hasProperty("jcr:lastModified")) {
-                nodeLastModified = contentNode.getProperty("jcr:lastModified").getDate().getTimeInMillis();
+            if (contentNode.hasProperty(JCR_LAST_MODIFIED)) {
+                nodeLastModified = contentNode.getProperty(JCR_LAST_MODIFIED).getDate().getTimeInMillis();
             }
             if (!this.configuration.isOverwrite() && nodeLastModified >= lastModified) {
                 return;
             }
-            log.info("Updating {} lastModified:{} New Content LastModified:{}", new Object[]{parentNode.getNode(name).getPath(), new Date(nodeLastModified), new Date(lastModified)});
+            log.debug("Updating {} lastModified:{} New Content LastModified:{}", parentNode.getNode(name).getPath(),
+                    new Date(nodeLastModified), new Date(lastModified));
         } else {
             this.createNode(name, "nt:file", null);
             this.createNode("jcr:content", "nt:resource", null);
@@ -648,7 +697,7 @@ public class DefaultContentCreator implements ContentCreator {
         if (mimeType == null) {
             mimeType = contentHelper.getMimeType(name);
             if (mimeType == null) {
-                log.info("createFile: Cannot find content type for {}, using {}", name, DEFAULT_CONTENT_TYPE);
+                log.debug("createFile: Cannot find content type for {}, using {}", name, DEFAULT_CONTENT_TYPE);
                 mimeType = DEFAULT_CONTENT_TYPE;
             }
         }
@@ -658,12 +707,13 @@ public class DefaultContentCreator implements ContentCreator {
             lastModified = System.currentTimeMillis();
         }
         this.createProperty("jcr:mimeType", mimeType, true);
-        this.createProperty("jcr:lastModified", lastModified, true);
+        this.createProperty(JCR_LAST_MODIFIED, lastModified, true);
         this.createProperty("jcr:data", data, true);
     }
 
     /**
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#switchCurrentNode(java.lang.String, java.lang.String)
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#switchCurrentNode(java.lang.String,
+     *      java.lang.String)
      */
     public boolean switchCurrentNode(String subPath, String newNodeType) throws RepositoryException {
         if (subPath.startsWith("/")) {
@@ -690,10 +740,14 @@ public class DefaultContentCreator implements ContentCreator {
         return true;
     }
 
-    /* (non-Javadoc)
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createGroup(java.lang.String, java.lang.String[], java.util.Map)
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createGroup(java.lang.
+     * String, java.lang.String[], java.util.Map)
      */
-    public void createGroup(final String name, String[] members, Map<String, Object> extraProperties) throws RepositoryException {
+    public void createGroup(final String name, String[] members, Map<String, Object> extraProperties)
+            throws RepositoryException {
 
         final Node parentNode = this.parentNodeStack.peek();
         Session session = parentNode.getSession();
@@ -701,23 +755,17 @@ public class DefaultContentCreator implements ContentCreator {
         UserManager userManager = AccessControlUtil.getUserManager(session);
         Authorizable authorizable = userManager.getAuthorizable(name);
         if (authorizable == null) {
-            //principal does not exist yet, so create it
-            Group group = userManager.createGroup(new Principal() {
-                                                      public String getName() {
-                                                          return name;
-                                                      }
-                                                  },
-                hashPath(name)
-            );
+            // principal does not exist yet, so create it
+            Group group = userManager.createGroup(() -> name, hashPath(name));
             authorizable = group;
         } else {
-            //principal already exists, check to make sure it is the expected type
+            // principal already exists, check to make sure it is the expected type
             if (!authorizable.isGroup()) {
                 throw new RepositoryException("A user already exists with the requested name: " + name);
             }
-            //group already exists so just update it below
+            // group already exists so just update it below
         }
-        //update the group members
+        // update the group members
         if (members != null) {
             Group group = (Group) authorizable;
             for (String member : members) {
@@ -737,33 +785,29 @@ public class DefaultContentCreator implements ContentCreator {
         }
     }
 
-    /* (non-Javadoc)
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createUser(java.lang.String, java.lang.String, java.util.Map)
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#createUser(java.lang.
+     * String, java.lang.String, java.util.Map)
      */
-    public void createUser(final String name, String password, Map<String, Object> extraProperties) throws RepositoryException {
+    public void createUser(final String name, String password, Map<String, Object> extraProperties)
+            throws RepositoryException {
         final Node parentNode = this.parentNodeStack.peek();
         Session session = parentNode.getSession();
 
         UserManager userManager = AccessControlUtil.getUserManager(session);
         Authorizable authorizable = userManager.getAuthorizable(name);
         if (authorizable == null) {
-            //principal does not exist yet, so create it
-            User user = userManager.createUser(name,
-                password,
-                new Principal() {
-                    public String getName() {
-                        return name;
-                    }
-                },
-                hashPath(name)
-            );
+            // principal does not exist yet, so create it
+            User user = userManager.createUser(name, password, () -> name, hashPath(name));
             authorizable = user;
         } else {
-            //principal already exists, check to make sure it is the expected type
+            // principal already exists, check to make sure it is the expected type
             if (authorizable.isGroup()) {
                 throw new RepositoryException("A group already exists with the requested name: " + name);
             }
-            //user already exists so just update it below
+            // user already exists so just update it below
         }
         if (extraProperties != null) {
             ValueFactory valueFactory = session.getValueFactory();
@@ -781,49 +825,58 @@ public class DefaultContentCreator implements ContentCreator {
      */
     protected String hashPath(String item) throws RepositoryException {
         try {
-            String hash = digest("sha1", (INSTANCE_SEED + item).getBytes("UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < STORAGE_LEVELS; i++) {
-                sb.append(hash, i * 2, (i * 2) + 2).append("/");
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RepositoryException("Unable to hash the path.", e);
-        } catch (UnsupportedEncodingException e) {
+            final String hash = digest("sha1", (INSTANCE_SEED + item).getBytes("UTF-8"));
+            return IntStream.range(0, STORAGE_LEVELS)
+                    .mapToObj(i -> hash.substring(i * 2, (i * 2) + 2))
+                    .collect(Collectors.joining("/", "", "/"));
+        } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
             throw new RepositoryException("Unable to hash the path.", e);
         }
     }
 
-    /* (non-Javadoc)
-     * @see org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String, java.lang.String, java.lang.String[], java.lang.String[])
-	 */
-    public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames, String order) throws RepositoryException {
-    	createAce(principalId, grantedPrivilegeNames, deniedPrivilegeNames, order, null, null, null);
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String,
+     * java.lang.String, java.lang.String[], java.lang.String[])
+     */
+    public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames,
+            String order) throws RepositoryException {
+        createAce(principalId, grantedPrivilegeNames, deniedPrivilegeNames, order, null, null, null);
     }
 
-    /* (non-Javadoc)
-	 * @see org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String, java.lang.String[], java.lang.String[], java.lang.String, java.util.Map, java.util.Map, java.util.Set)
-	 */
-	@Override
-	public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames, String order,
-			Map<String, Value> restrictions, Map<String, Value[]> mvRestrictions, Set<String> removedRestrictionNames)
-			throws RepositoryException {
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * org.apache.sling.jcr.contentloader.ContentCreator#createAce(java.lang.String,
+     * java.lang.String[], java.lang.String[], java.lang.String, java.util.Map,
+     * java.util.Map, java.util.Set)
+     */
+    @Override
+    public void createAce(String principalId, String[] grantedPrivilegeNames, String[] deniedPrivilegeNames,
+            String order, Map<String, Value> restrictions, Map<String, Value[]> mvRestrictions,
+            Set<String> removedRestrictionNames) throws RepositoryException {
         final Node parentNode = this.parentNodeStack.peek();
         Session session = parentNode.getSession();
-        
+
         PrincipalManager principalManager = AccessControlUtil.getPrincipalManager(session);
         Principal principal = principalManager.getPrincipal(principalId);
         if (principal == null) {
-            // SLING-7268 - as pointed out in OAK-5496, we cannot successfully use PrincipalManager#getPrincipal in oak 
-        	//  without the session that created the principal getting saved first (and a subsequent index update).  
-        	//  Workaround by trying the UserManager#getAuthorizable API to locate the principal. 
+            // SLING-7268 - as pointed out in OAK-5496, we cannot successfully use
+            // PrincipalManager#getPrincipal in oak
+            // without the session that created the principal getting saved first (and a
+            // subsequent index update).
+            // Workaround by trying the UserManager#getAuthorizable API to locate the
+            // principal.
             UserManager userManager = AccessControlUtil.getUserManager(session);
             final Authorizable authorizable = userManager.getAuthorizable(principalId);
             if (authorizable != null) {
                 principal = authorizable.getPrincipal();
             }
         }
-        		
+
         if (principal == null) {
             throw new RepositoryException("No principal found for id: " + principalId);
         }
@@ -833,20 +886,19 @@ public class DefaultContentCreator implements ContentCreator {
             AccessControlUtil.replaceAccessControlEntry(session, resourcePath, principal, grantedPrivilegeNames, deniedPrivilegeNames, null, order, 
             		restrictions, mvRestrictions, removedRestrictionNames);
         }
-	}
+    }
 
-	
-	/* (non-Javadoc)
-	 * @see org.apache.sling.jcr.contentloader.ContentCreator#getParent()
-	 */
-	@Override
-	public Node getParent() {
-        final Node parentNode = this.parentNodeStack.peek();
-        return parentNode;
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.apache.sling.jcr.contentloader.ContentCreator#getParent()
+     */
+    @Override
+    public Node getParent() {
+        return this.parentNodeStack.peek();
+    }
 
-
-	/**
+    /**
      * used for the md5
      */
     private static final char[] hexTable = "0123456789abcdef".toCharArray();
@@ -854,17 +906,20 @@ public class DefaultContentCreator implements ContentCreator {
     /**
      * Digest the plain string using the given algorithm.
      *
-     * @param algorithm The alogrithm for the digest. This algorithm must be
-     *                  supported by the MessageDigest class.
-     * @param data      the data to digest with the given algorithm
+     * @param algorithm
+     *            The alogrithm for the digest. This algorithm must be supported by
+     *            the MessageDigest class.
+     * @param data
+     *            the data to digest with the given algorithm
      * @return The digested plain text String represented as Hex digits.
-     * @throws java.security.NoSuchAlgorithmException if the desired algorithm is not supported by
-     *                                                the MessageDigest class.
+     * @throws java.security.NoSuchAlgorithmException
+     *             if the desired algorithm is not supported by the MessageDigest
+     *             class.
      */
     public static String digest(String algorithm, byte[] data) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance(algorithm);
         byte[] digest = md.digest(data);
-        StringBuffer res = new StringBuffer(digest.length * 2);
+        StringBuilder res = new StringBuilder(digest.length * 2);
         for (int i = 0; i < digest.length; i++) {
             byte b = digest[i];
             res.append(hexTable[(b >> 4) & 15]);
@@ -879,21 +934,16 @@ public class DefaultContentCreator implements ContentCreator {
     protected Node findVersionableAncestor(Node node) throws RepositoryException {
         if (node == null) {
             return null;
-        } else if (isVersionable(node)) {
-            return node;
-        } else {
-            try {
-                node = node.getParent();
-                return findVersionableAncestor(node);
-            } catch (ItemNotFoundException e) {
-                // top-level
-                return null;
-            }
         }
-    }
-
-    protected boolean isVersionable(Node node) throws RepositoryException {
-        return node.isNodeType("mix:versionable");
+        if (node.isNodeType("mix:versionable")) {
+            return node;
+        } 
+        try {
+            return findVersionableAncestor(node.getParent());
+        } catch (ItemNotFoundException e) {
+            // top-level
+            return null;
+        }
     }
 
     /**
@@ -902,17 +952,75 @@ public class DefaultContentCreator implements ContentCreator {
     protected void checkoutIfNecessary(Node node) throws RepositoryException {
         if (this.configuration.isAutoCheckout()) {
             Node versionableNode = findVersionableAncestor(node);
-            if (versionableNode != null) {
-                if (!versionableNode.isCheckedOut()) {
-                	VersionManager versionManager = versionableNode.getSession().getWorkspace().getVersionManager();
-                	versionManager.checkout(versionableNode.getPath());
-                	
-                    if (this.importListener != null) {
-                        this.importListener.onCheckout(versionableNode.getPath());
-                    }
+            if (versionableNode != null && !versionableNode.isCheckedOut()) {
+                VersionManager versionManager = versionableNode.getSession().getWorkspace().getVersionManager();
+                versionManager.checkout(versionableNode.getPath());
+                if (this.importListener != null) {
+                    this.importListener.onCheckout(versionableNode.getPath());
                 }
             }
         }
+    }
+
+    @Override
+    public void finish() throws RepositoryException {
+        if (this.configuration.isMerge()) {
+            Session session = this.createdRootNode.getSession();
+            importedNodes.stream().flatMap(n -> {
+                Set<String> iterable = getPeers(n,session);
+                return StreamSupport.stream(iterable.spliterator(), false);
+            }).filter(path -> !importedNodes.contains(path)).forEach(path -> removeNode(path,session));
+            importedNodes.stream().flatMap(n -> {
+                Set<String> iterable = getChildren(n,session);
+                return StreamSupport.stream(iterable.spliterator(), false);
+            }).filter(path -> !importedNodes.contains(path)).forEach(path -> removeNode(path,session));
+        }
+    }
+    
+    private Set<String> getPeers(String path,Session session) {
+            try {
+                log.debug("finding peers for {}", path);
+                NodeIterator it = session.getNode(path).getParent().getNodes();
+                Set<String> peers = new LinkedHashSet<>();
+                while (it.hasNext()) {
+                    String child = it.nextNode().getPath();
+                    if (!child.equals(path)) {
+                        peers.add(child);
+                    }
+                }
+                return peers;
+            } catch (RepositoryException e) {
+                return Collections.emptySet();
+            }
+    }
+    
+    private Set<String> getChildren(String path,Session session) {
+        try {
+            log.debug("finding children for {}", path);
+            NodeIterator it = session.getNode(path).getNodes();
+            Set<String> peers = new LinkedHashSet<>();
+            while (it.hasNext()) {
+                String child = it.nextNode().getPath();
+                peers.add(child);
+            }
+            return peers;
+        } catch (RepositoryException e) {
+            return Collections.emptySet();
+        }
+}
+    
+    private void removeNode(String item, Session session) {
+        try {
+            if (this.importListener != null) {
+                this.importListener.onDelete(item);
+            }
+            log.debug("removing {}", item);
+            session.removeItem(item);
+            session.save();
+        } catch (RepositoryException e) {
+            log.warn("unable to remove node {}", item);
+        }
+        
     }
 
 }

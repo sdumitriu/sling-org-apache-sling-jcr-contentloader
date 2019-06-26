@@ -33,6 +33,16 @@ public abstract class ImportOptions {
 	 * @return true to overwrite nodes, false otherwise
 	 */
 	public abstract boolean isOverwrite();
+	
+	   /**
+     * Specifies whether imported nodes should merge with existing nodes.
+     * NOTE: this means the existing nodes that are not imported will  be 
+     * deleted.
+     * @return true to overwrite nodes, false otherwise
+     */
+    public boolean isMerge() {
+        return false;
+    }
 
 	/**
 	 * Specifies whether imported properties should overwrite existing properties.
@@ -40,6 +50,16 @@ public abstract class ImportOptions {
 	 */
 	public abstract boolean isPropertyOverwrite();
 
+   /**
+     * Specifies whether imported properties should merge with existing properties.
+     * NOTE: this means that properties that are not imported
+     * will be removed
+     * @return true to overwrite nodes, false otherwise
+     */
+    public boolean isPropertyMerge() {
+        return false;
+    }
+    
 	/**
 	 * Specifies whether versionable nodes is automatically checked in at the
 	 * end of the import operation.
