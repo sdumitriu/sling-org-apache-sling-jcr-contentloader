@@ -86,10 +86,9 @@ public abstract class ContentloaderTestSupport extends TestSupport {
 
     public ModifiableCompositeOption baseConfiguration() {
         final Option contentloader = mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"));
-        final ModifiableCompositeOption quickstart = quickstart().remove(contentloader);
         return composite(
             super.baseConfiguration(),
-            quickstart,
+            quickstart(),
             // Sling JCR ContentLoader
             testBundle("bundle.filename"),
             factoryConfiguration("org.apache.sling.resource.presence.internal.ResourcePresenter")
@@ -101,6 +100,8 @@ public abstract class ContentloaderTestSupport extends TestSupport {
                 .asOption(),
             slingResourcePresence(),
             junitBundles()
+        ).remove(
+            contentloader
         );
     }
 
