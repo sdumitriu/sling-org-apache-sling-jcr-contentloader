@@ -39,6 +39,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.ops4j.pax.exam.CoreOptions.options;
 
 /**
  * Basic test of a bundle that provides I18N initial content
@@ -55,10 +56,10 @@ public class I18nInitialContentIT extends ContentloaderTestSupport {
             DEFAULT_PATH_IN_BUNDLE, "i18n/en.json.xml"
         );
         final Option bundle = buildInitialContentBundle(header, content);
-        return new Option[]{
+        return options(
             baseConfiguration(),
             bundle
-        };
+        );
     }
 
     @Test

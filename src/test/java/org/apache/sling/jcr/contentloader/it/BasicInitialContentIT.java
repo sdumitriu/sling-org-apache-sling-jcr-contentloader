@@ -36,6 +36,7 @@ import org.osgi.framework.Bundle;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.ops4j.pax.exam.CoreOptions.options;
 
 /**
  * Basic test of a bundle that provides initial content
@@ -54,10 +55,10 @@ public class BasicInitialContentIT extends ContentloaderTestSupport {
             DEFAULT_PATH_IN_BUNDLE, "folder-with-descriptor/test2.txt"
         );
         final Option bundle = buildInitialContentBundle(header, content);
-        return new Option[]{
+        return options(
             baseConfiguration(),
             bundle
-        };
+        );
     }
 
     @Test
