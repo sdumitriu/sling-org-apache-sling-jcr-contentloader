@@ -66,8 +66,6 @@
                         <exclude>src/test/**/*.ordered-json</exclude>
                         <exclude>src/test/**/*.xml</exclude>
                         <exclude>src/test/**/*.txt</exclude>
-                        <exclude>jackrabbit/**</exclude>
-                        <exclude>derby.log</exclude>
                     </excludes>
                 </configuration>
             </plugin>
