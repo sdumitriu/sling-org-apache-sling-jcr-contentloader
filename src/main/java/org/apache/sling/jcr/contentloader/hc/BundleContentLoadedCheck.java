@@ -96,7 +96,7 @@ public class BundleContentLoadedCheck implements HealthCheck {
         this.bundleContext = bundleContext;
         this.includesRegex = Pattern.compile(config.includesRegex());
         String excludesRegex2 = config.excludesRegex();
-		this.excludesRegex = (excludesRegex2 != null && !excludesRegex2.isEmpty()) ? Pattern.compile(excludesRegex2) : null;
+        this.excludesRegex = (excludesRegex2 != null && !excludesRegex2.isEmpty()) ? Pattern.compile(excludesRegex2) : null;
         this.useCriticalForNotLoaded = config.useCriticalForNotLoaded();
         LOG.debug("Activated bundle content loaded HC for includesRegex={} excludesRegex={}% useCriticalForNotLoaded={}", includesRegex, excludesRegex, useCriticalForNotLoaded);
     }
@@ -115,12 +115,12 @@ public class BundleContentLoadedCheck implements HealthCheck {
 
         Session metadataSession = null;
         try {
-        	metadataSession = repository.loginAdministrative(null);
-        	
-        	BundleHelper bundleHelper = new ContentLoaderService();
-        	
+            metadataSession = repository.loginAdministrative(null);
+            
+            BundleHelper bundleHelper = new ContentLoaderService();
+            
             for (Bundle bundle : bundles) {
-            	String bundleSymbolicName = bundle.getSymbolicName();
+                String bundleSymbolicName = bundle.getSymbolicName();
                 if (!includesRegex.matcher(bundleSymbolicName).matches()) {
                     LOG.debug("Bundle {} not matched by {}", bundleSymbolicName, includesRegex);
                     continue;
@@ -131,20 +131,20 @@ public class BundleContentLoadedCheck implements HealthCheck {
                     countExcluded ++;
                     continue;
                 }
-            	
+
                 // check if bundle has initial content
                 final Iterator<PathEntry> pathIter = PathEntry.getContentPaths(bundle);
                 if (pathIter == null) {
                     log.debug("Bundle {} has no initial content", bundleSymbolicName);
                 } else {
-                	relevantBundlesCount++;
-                	
+                    relevantBundlesCount++;
+
                     // check if the content has already been loaded
                     final Map<String, Object> bundleContentInfo = bundleHelper.getBundleContentInfo(metadataSession, bundle, false);
 
                     // if we don't get an info, someone else is currently loading
                     if (bundleContentInfo == null) {
-                    	notLoadedCount++;
+                        notLoadedCount++;
                         String msg = "Not loaded bundle {} {}";
                         Object[] msgObjs = new Object[] {bundle.getBundleId(), bundleSymbolicName};
                         LOG.debug(msg, msgObjs);
@@ -154,7 +154,7 @@ public class BundleContentLoadedCheck implements HealthCheck {
                             log.warn(msg, msgObjs);
                         }
                     } else {
-                    	try {
+                        try {
                             final boolean contentAlreadyLoaded = ((Boolean) bundleContentInfo.get(ContentLoaderService.PROPERTY_CONTENT_LOADED)).booleanValue();
                             boolean isBundleUpdated = false;
                             Calendar lastLoadedAt = (Calendar) bundleContentInfo.get(ContentLoaderService.PROPERTY_CONTENT_LOADED_AT);
@@ -173,19 +173,21 @@ public class BundleContentLoadedCheck implements HealthCheck {
                                 } else {
                                     log.warn(msg, msgObjs);
                                 }
-                            }                    	
-                    	} finally {
+                            }
+                        } finally {
                             bundleHelper.unlockBundleContentInfo(metadataSession, bundle, false, null);
-                    	}
+                        }
                     }
                 }
             }
         } catch (RepositoryException t) {
-            LOG.error("Unexpected error: " + t.getMessage(), t);
+            String msg = "Unexpected error: " + t.getMessage();
+            LOG.error(msg, t);
+            log.critical(msg);
         } finally {
             if (metadataSession != null) {
                 try {
-                	metadataSession.logout();
+                    metadataSession.logout();
                 } catch (Exception t) {
                     LOG.error("Unable to log out of session: " + t.getMessage(), t);
                 }

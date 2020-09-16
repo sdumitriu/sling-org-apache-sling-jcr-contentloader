@@ -8,5 +8,5 @@ Bundle-Category:\
   @org.apache.sling.jcr.contentparser-*.jar!/org/apache/sling/jcr/contentparser/impl/JsonTicksConverter.class
 
 # healthcheck support is optional
- Import-Package: org.apache.felix.hc.api;resolution:=optional,\
+Import-Package: org.apache.felix.hc.api;resolution:=optional,\
   *
