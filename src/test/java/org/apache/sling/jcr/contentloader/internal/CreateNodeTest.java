@@ -16,22 +16,24 @@
  */
 package org.apache.sling.jcr.contentloader.internal;
 
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.AUTO_CHECKOUT;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.OVERWRITE_NODE;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.OVERWRITE_PROPERTIES;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.createImportOptions;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.*;
 
 import java.util.HashMap;
 import java.util.UUID;
 
 import javax.jcr.Node;
-import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 
-import org.apache.sling.commons.testing.jcr.RepositoryProvider;
-import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.jcr.contentloader.ContentReader;
-import org.junit.After;
+import org.apache.sling.testing.mock.sling.ResourceResolverType;
+import org.apache.sling.testing.mock.sling.junit.SlingContext;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 /** TODO might need to consolidate this with DefaultContentCreatorTest */
@@ -43,27 +45,20 @@ public class CreateNodeTest {
     private final static String DEFAULT_NAME = "default-name";
     public static final String MIX_VERSIONABLE = "mix:versionable";  
     
+    @Rule
+    public final SlingContext context = new SlingContext(ResourceResolverType.JCR_OAK);
+
     private final String uniqueId() {
         return getClass().getSimpleName() + UUID.randomUUID();
     }
     
     @Before
     public void setup() throws Exception {
-        final SlingRepository repo = RepositoryProvider.instance().getRepository();
-        session = repo.loginAdministrative(null);
+    	session = context.resourceResolver().adaptTo(Session.class);
         contentCreator = new DefaultContentCreator(null);
         contentCreator.init(createImportOptions(OVERWRITE_NODE | OVERWRITE_PROPERTIES | AUTO_CHECKOUT),
                 new HashMap<String, ContentReader>(), null, null);
         testRoot = session.getRootNode().addNode(getClass().getSimpleName()).addNode(uniqueId());
-    }
-    
-    @After
-    public void cleanup() throws RepositoryException {
-        if(session != null) {
-            session.save(); // to detect any invalid transient content
-            session.logout();
-            session = null;
-        }
     }
     
     @Test

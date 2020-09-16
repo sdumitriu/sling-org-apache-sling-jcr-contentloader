@@ -18,8 +18,29 @@
  */
 package org.apache.sling.jcr.contentloader.internal;
 
-import junitx.util.PrivateAccessor;
-import org.apache.sling.commons.testing.jcr.RepositoryUtil;
+import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.BUNDLE_CONTENT_NODE;
+import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.PROPERTY_CONTENT_LOADED;
+import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.PROPERTY_CONTENT_LOADED_AT;
+import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.PROPERTY_UNINSTALL_PATHS;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Calendar;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import javax.jcr.Node;
+import javax.jcr.RepositoryException;
+import javax.jcr.Session;
+import javax.jcr.lock.LockManager;
+
 import org.apache.sling.testing.mock.osgi.MockBundle;
 import org.apache.sling.testing.mock.sling.ResourceResolverType;
 import org.apache.sling.testing.mock.sling.junit.SlingContext;
@@ -30,14 +51,7 @@ import org.junit.rules.ExpectedException;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleEvent;
 
-import javax.jcr.*;
-import javax.jcr.lock.LockManager;
-
-import java.util.*;
-
-import static org.junit.Assert.*;
-import static org.hamcrest.CoreMatchers.*;
-import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.*;
+import junitx.util.PrivateAccessor;
 
 public class ContentLoaderServiceTest {
 
@@ -56,10 +70,7 @@ public class ContentLoaderServiceTest {
         // whiteboard which holds readers
         context.registerInjectActivateService(new ContentReaderWhiteboard());
 
-        // TODO - SlingRepository should be registered out of the box, not after calling context.resourceResolver()
-        // TODO - sling node types should _always_ be registered
         session = context.resourceResolver().adaptTo(Session.class);
-        RepositoryUtil.registerSlingNodeTypes(session);
 
         // register the content loader service
         underTest = context.registerInjectActivateService(new ContentLoaderService());

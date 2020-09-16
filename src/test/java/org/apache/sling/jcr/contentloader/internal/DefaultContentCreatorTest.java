@@ -16,28 +16,46 @@
  */
 package org.apache.sling.jcr.contentloader.internal;
 
-import java.text.ParseException;
-import java.util.*;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.AUTO_CHECKOUT;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.CHECK_IN;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.NO_OPTIONS;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.OVERWRITE_NODE;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.OVERWRITE_PROPERTIES;
+import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.createImportOptions;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-import javax.jcr.*;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import javax.jcr.Node;
+import javax.jcr.Property;
+import javax.jcr.PropertyType;
+import javax.jcr.RepositoryException;
+import javax.jcr.Session;
 import javax.jcr.nodetype.NodeType;
 
-import junitx.util.PrivateAccessor;
-import org.apache.sling.commons.testing.jcr.RepositoryProvider;
-import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.jcr.contentloader.ContentImportListener;
 import org.apache.sling.jcr.contentloader.ContentReader;
+import org.apache.sling.testing.mock.sling.ResourceResolverType;
+import org.apache.sling.testing.mock.sling.junit.SlingContext;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.integration.junit4.JUnit4Mockery;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import static org.junit.Assert.*;
-import static org.apache.sling.jcr.contentloader.internal.ImportOptionsFactory.*;
+import junitx.util.PrivateAccessor;
 
 public class DefaultContentCreatorTest {
 
@@ -50,25 +68,18 @@ public class DefaultContentCreatorTest {
     Property prop;
 
     @Rule
+    public final SlingContext context = new SlingContext(ResourceResolverType.JCR_OAK);
+
+    @Rule
     public ExpectedException thrown = ExpectedException.none();
 
     @Before
     public void setup() throws Exception {
-        final SlingRepository repo = RepositoryProvider.instance().getRepository();
-        session = repo.loginAdministrative(null);
+    	session = context.resourceResolver().adaptTo(Session.class);
         contentCreator = new DefaultContentCreator(null);
         contentCreator.init(createImportOptions(OVERWRITE_NODE|OVERWRITE_PROPERTIES|AUTO_CHECKOUT),
                 new HashMap<String, ContentReader>(), null, null);
         parentNode = session.getRootNode().addNode(getClass().getSimpleName()).addNode(uniqueId());
-    }
-
-    @After
-    public void cleanup() throws RepositoryException {
-        if(session != null) {
-            session.save();
-            session.logout();
-            session = null;
-        }
     }
 
     @Test

@@ -26,7 +26,6 @@ import static org.junit.Assert.assertThat;
 import javax.jcr.Session;
 
 import org.apache.sling.api.resource.Resource;
-import org.apache.sling.commons.testing.jcr.RepositoryUtil;
 import org.apache.sling.jcr.contentloader.internal.readers.JsonReader;
 import org.apache.sling.jcr.contentloader.internal.readers.XmlReader;
 import org.apache.sling.jcr.contentloader.internal.readers.ZipReader;
@@ -55,11 +54,6 @@ public class BundleContentLoaderTest {
 
         // whiteboard which holds readers
         context.registerInjectActivateService(new ContentReaderWhiteboard());
-
-        // TODO - SlingRepository should be registered out of the box, not after calling context.resourceResolver()
-        // TODO - sling node types should _always_ be registered
-        Session session = context.resourceResolver().adaptTo(Session.class);
-        RepositoryUtil.registerSlingNodeTypes(session);
 
         // register the content loader service
         BundleHelper bundleHelper = context.registerInjectActivateService(new ContentLoaderService());
