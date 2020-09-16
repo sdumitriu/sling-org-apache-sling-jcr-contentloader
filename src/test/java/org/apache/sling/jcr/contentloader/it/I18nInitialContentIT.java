@@ -18,14 +18,20 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.ops4j.pax.exam.CoreOptions.options;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.factoryConfiguration;
+
 import java.io.IOException;
 
 import javax.jcr.Node;
 import javax.jcr.RepositoryException;
 import javax.jcr.nodetype.NodeType;
 
-import com.google.common.collect.ImmutableListMultimap;
-import com.google.common.collect.Multimap;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.ops4j.pax.exam.Configuration;
@@ -35,11 +41,8 @@ import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
 import org.ops4j.pax.exam.spi.reactors.PerClass;
 import org.osgi.framework.Bundle;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.ops4j.pax.exam.CoreOptions.options;
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Multimap;
 
 /**
  * Basic test of a bundle that provides I18N initial content
@@ -56,12 +59,28 @@ public class I18nInitialContentIT extends ContentloaderTestSupport {
             DEFAULT_PATH_IN_BUNDLE, "i18n/en.json.xml"
         );
         final Option bundle = buildInitialContentBundle(header, content);
+        // configure the health check component
+        Option hcConfig = factoryConfiguration("org.apache.sling.jcr.contentloader.hc.BundleContentLoadedCheck")
+            .put("hc.tags", new String[] {TAG_TESTING_CONTENT_LOADING})
+            .asOption();
         return options(
             baseConfiguration(),
+            hcConfig,
             bundle
         );
     }
 
+    /* (non-Javadoc)
+     * @see org.apache.sling.jcr.contentloader.it.ContentloaderTestSupport#setup()
+     */
+    @Before
+    @Override
+    public void setup() throws Exception {
+        super.setup();
+        
+        waitForContentLoaded();
+    }
+    
     @Test
     public void bundleStarted() {
         final Bundle b = findBundle(BUNDLE_SYMBOLICNAME);

@@ -18,15 +18,39 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
+import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
+import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.ops4j.pax.exam.CoreOptions.composite;
+import static org.ops4j.pax.exam.CoreOptions.junitBundles;
+import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
+import static org.ops4j.pax.exam.CoreOptions.streamBundle;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.factoryConfiguration;
+import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
+import static org.ops4j.pax.tinybundles.core.TinyBundles.withBnd;
+import static org.apache.felix.hc.api.FormattingResultLog.msHumanReadable;
+
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
+import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 
-import com.google.common.collect.Multimap;
+import org.apache.felix.hc.api.Result;
+import org.apache.felix.hc.api.ResultLog;
+import org.apache.felix.hc.api.execution.HealthCheckExecutionResult;
+import org.apache.felix.hc.api.execution.HealthCheckExecutor;
+import org.apache.felix.hc.api.execution.HealthCheckSelector;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.resource.presence.ResourcePresence;
 import org.apache.sling.testing.paxexam.SlingOptions;
@@ -44,20 +68,11 @@ import org.osgi.framework.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
-import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.ops4j.pax.exam.CoreOptions.composite;
-import static org.ops4j.pax.exam.CoreOptions.junitBundles;
-import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
-import static org.ops4j.pax.exam.CoreOptions.streamBundle;
-import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.factoryConfiguration;
-import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
-import static org.ops4j.pax.tinybundles.core.TinyBundles.withBnd;
+import com.google.common.collect.Multimap;
 
 public abstract class ContentloaderTestSupport extends TestSupport {
+
+    protected static final String TAG_TESTING_CONTENT_LOADING = "testing-content-loading";
 
     @Inject
     protected BundleContext bundleContext;
@@ -84,6 +99,9 @@ public abstract class ContentloaderTestSupport extends TestSupport {
     @Filter(value = "(path=" + CONTENT_ROOT_PATH + ")")
     private ResourcePresence resourcePresence;
 
+    @Inject
+    private HealthCheckExecutor hcExecutor;
+    
     public ModifiableCompositeOption baseConfiguration() {
         final Option contentloader = mavenBundle().groupId("org.apache.sling").artifactId("org.apache.sling.jcr.contentloader").version(SlingOptions.versionResolver.getVersion("org.apache.sling", "org.apache.sling.jcr.contentloader"));
         return composite(
@@ -121,6 +139,75 @@ public abstract class ContentloaderTestSupport extends TestSupport {
         session.logout();
     }
 
+    /**
+     * Wait for the bundle content loading to be completed.
+     * Timeout is 2 minutes with 5 second iteration delay.
+     */
+    protected void waitForContentLoaded() throws Exception {
+        waitForContentLoaded(TimeUnit.MINUTES.toMillis(2), TimeUnit.SECONDS.toMillis(5));
+    }
+    /**
+     * Wait for the bundle content loading to be completed
+     * 
+     * @param timeoutMsec the max time to wait for the content to be loaded
+     * @param nextIterationDelay the sleep time between the check attempts
+     */
+    protected void waitForContentLoaded(long timeoutMsec, long nextIterationDelay) throws Exception {
+        new Retry(timeoutMsec, nextIterationDelay) {
+            /* (non-Javadoc)
+             * @see org.apache.sling.jcr.contentloader.it.Retry#exec()
+             */
+            @Override
+            protected void exec() throws Exception {
+                logger.info("Performing content-loaded health check");
+                HealthCheckSelector hcs = HealthCheckSelector.tags(TAG_TESTING_CONTENT_LOADING);
+                List<HealthCheckExecutionResult> results = hcExecutor.execute(hcs);
+                logger.info("content-loaded health check got {} results", results.size());
+                assertFalse(results.isEmpty());
+                for (final HealthCheckExecutionResult exR : results) {
+                    final Result r = exR.getHealthCheckResult();
+                    logger.info("content-loaded health check: {}", toHealthCheckResultInfo(exR, false));
+                    assertTrue(r.isOk());
+                }
+            }
+        };
+    }
+    
+    /**
+     * Produce a human readable report of the health check results that is suitable for
+     * debugging or writing to a log
+     */
+    protected String toHealthCheckResultInfo(final HealthCheckExecutionResult exResult, final boolean debug)  throws IOException {
+        String value = null;
+        try (StringWriter resultWriter = new StringWriter(); BufferedWriter writer = new BufferedWriter(resultWriter)) {
+            final Result result = exResult.getHealthCheckResult();
+
+            writer.append('"').append(exResult.getHealthCheckMetadata().getTitle()).append('"');
+            writer.append(" result is: ").append(result.getStatus().toString());
+            writer.newLine();
+            writer.append("   Finished: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(exResult.getFinishedAt()) + " after "
+                    + msHumanReadable(exResult.getElapsedTimeInMs()));
+
+            for (final ResultLog.Entry e : result) {
+                if (!debug && e.isDebug()) {
+                    continue;
+                }
+                writer.newLine();
+                writer.append("   ");
+                writer.append(e.getStatus().toString());
+                writer.append(' ');
+                writer.append(e.getMessage());
+                if (e.getException() != null) {
+                    writer.append(" ");
+                    writer.append(e.getException().toString());
+                }
+            }
+            writer.flush();
+            value = resultWriter.toString();
+        }
+        return value;
+    }
+    
     /**
      * Add content to our test bundle
      */
