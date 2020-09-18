@@ -299,7 +299,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     @Override
     public Session getSession()
     throws RepositoryException {
-        return getRepository().loginAdministrative(null);
+        return getRepository().loginService(null, null);
     }
 
     /**
@@ -307,7 +307,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
      */
     @Override
     public Session getSession(final String workspace) throws RepositoryException {
-        return getRepository().loginAdministrative(workspace);
+        return getRepository().loginService(null, workspace);
     }
 
     /**

@@ -18,6 +18,7 @@
  */
 package org.apache.sling.jcr.contentloader.it;
 
+import static org.apache.felix.hc.api.FormattingResultLog.msHumanReadable;
 import static org.apache.sling.testing.paxexam.SlingOptions.slingQuickstartOakTar;
 import static org.apache.sling.testing.paxexam.SlingOptions.slingResourcePresence;
 import static org.junit.Assert.assertEquals;
@@ -29,9 +30,7 @@ import static org.ops4j.pax.exam.CoreOptions.junitBundles;
 import static org.ops4j.pax.exam.CoreOptions.mavenBundle;
 import static org.ops4j.pax.exam.CoreOptions.streamBundle;
 import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.factoryConfiguration;
-import static org.ops4j.pax.exam.cm.ConfigurationAdminOptions.newConfiguration;
 import static org.ops4j.pax.tinybundles.core.TinyBundles.withBnd;
-import static org.apache.felix.hc.api.FormattingResultLog.msHumanReadable;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -45,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
+import javax.jcr.SimpleCredentials;
 
 import org.apache.felix.hc.api.Result;
 import org.apache.felix.hc.api.ResultLog;
@@ -71,6 +71,9 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Multimap;
 
 public abstract class ContentloaderTestSupport extends TestSupport {
+
+    protected static final String CONTENT_LOADER_VERIFY_USER = "content-loader-user";
+    protected static final char[] CONTENT_LOADER_VERIFY_PWD = "testing".toCharArray();
 
     protected static final String TAG_TESTING_CONTENT_LOADING = "testing-content-loading";
 
@@ -107,14 +110,32 @@ public abstract class ContentloaderTestSupport extends TestSupport {
         return composite(
             super.baseConfiguration(),
             quickstart(),
+            // SLING-9735 - add server user for the o.a.s.jcr.contentloader bundle
+            factoryConfiguration("org.apache.sling.jcr.repoinit.RepositoryInitializer")
+                .put("scripts", new String[] {
+                        "create service user sling-content-loader\n" +
+                        "\n" +
+                        "set ACL for sling-content-loader\n" +
+                        "    allow   jcr:all    on /\n" +
+                        "end"})
+                .asOption(),
+            factoryConfiguration("org.apache.sling.serviceusermapping.impl.ServiceUserMapperImpl.amended")
+                .put("user.mapping", new String[]{"org.apache.sling.jcr.contentloader=sling-content-loader"})
+                .asOption(),
             // Sling JCR ContentLoader
             testBundle("bundle.filename"),
             factoryConfiguration("org.apache.sling.resource.presence.internal.ResourcePresenter")
                 .put("path", CONTENT_ROOT_PATH)
                 .asOption(),
-            // testing
-            newConfiguration("org.apache.sling.jcr.base.internal.LoginAdminWhitelist")
-                .put("whitelist.bundles.regexp", "PAXEXAM-PROBE-.*")
+            // testing - add a user to use to login and verify the content loading has happened
+            factoryConfiguration("org.apache.sling.jcr.repoinit.RepositoryInitializer")
+                .put("scripts", new String[] {
+                        "create user " + CONTENT_LOADER_VERIFY_USER + " with password " + new String(CONTENT_LOADER_VERIFY_PWD) +"\n" +
+                        "\n" +
+                        "set ACL for content-loader-user\n" +
+                        "    allow   jcr:read              on /\n" +
+                        "    allow   jcr:readAccessControl on /\n" +
+                        "end"})
                 .asOption(),
             slingResourcePresence(),
             junitBundles()
@@ -131,7 +152,7 @@ public abstract class ContentloaderTestSupport extends TestSupport {
 
     @Before
     public void setup() throws Exception {
-        session = repository.loginAdministrative(null);
+        session = repository.login(new SimpleCredentials(CONTENT_LOADER_VERIFY_USER, CONTENT_LOADER_VERIFY_PWD));
     }
 
     @After

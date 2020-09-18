@@ -115,7 +115,7 @@ public class BundleContentLoadedCheck implements HealthCheck {
 
         Session metadataSession = null;
         try {
-            metadataSession = repository.loginAdministrative(null);
+            metadataSession = repository.loginService(null, null);
             
             BundleHelper bundleHelper = new ContentLoaderService();
             
