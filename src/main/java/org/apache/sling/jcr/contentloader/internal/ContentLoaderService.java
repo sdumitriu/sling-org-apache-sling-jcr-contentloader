@@ -94,6 +94,9 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     @Reference
     private ContentReaderWhiteboard contentReaderWhiteboard;
 
+    @Reference
+    private SlingSettingsService slingSettings;
+
     /**
      * The initial content loader which is called to load initial content up
      * into the repository when the providing bundle is installed.
@@ -222,7 +225,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     @Activate
     protected synchronized void activate(BundleContext bundleContext) {
         this.slingId = this.settingsService.getSlingId();
-        this.bundleContentLoader = new BundleContentLoader(this, contentReaderWhiteboard);
+        this.bundleContentLoader = new BundleContentLoader(this, contentReaderWhiteboard, slingSettings.getRunModes());
 
         bundleContext.addBundleListener(this);
 

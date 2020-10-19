@@ -93,6 +93,14 @@ public class PathEntry extends ImportOptions {
      */
     public static final String IGNORE_CONTENT_READERS_DIRECTIVE = "ignoreImportProviders";
 
+    /**
+     * If the content should be skipped with a particular runmode. By
+     * default this will be an empty string which means the content will be
+     * installed regardless of the runmode
+     * @since 2.4.0
+     */
+    public static final String SKIP_RUNMODE = "skipRunmode";
+
     private final boolean propertyMerge;
     
     private final boolean nodeMerge;
@@ -105,6 +113,9 @@ public class PathEntry extends ImportOptions {
 
     /** Should existing content properties be overwritten? */
     private final boolean overwriteProperties;
+
+    /** The content at the path will be skipped for this runmode */
+    private final String skipRunmode;
 
     /** Should existing content be uninstalled? */
     private final boolean uninstall;
@@ -233,6 +244,9 @@ public class PathEntry extends ImportOptions {
         }
 
         // workspace directive
+        this.skipRunmode = entry.getDirectiveValue(SKIP_RUNMODE);
+
+        // workspace directive
         final String workspaceValue = entry.getDirectiveValue(WORKSPACE_DIRECTIVE);
         if (pathValue != null) {
             this.workspace = workspaceValue;
@@ -293,6 +307,10 @@ public class PathEntry extends ImportOptions {
         return this.ignoreContentReaders.contains(extension);
     }
 
+    public String getSkipRunmode(){
+        return this.skipRunmode;
+    }
+
     public String getTarget() {
         return target;
     }
@@ -301,11 +319,9 @@ public class PathEntry extends ImportOptions {
         return workspace;
     }
 
-
     public boolean isPropertyMerge() {
         return this.propertyMerge;
     }
-
 
     public boolean isMerge() {
         return this.nodeMerge;

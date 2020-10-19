@@ -21,7 +21,10 @@ package org.apache.sling.jcr.contentloader.internal;
 import static java.util.Collections.singletonMap;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.junit.Assert.assertThat;
+
+import java.util.Collections;
 
 import javax.jcr.Session;
 
@@ -60,7 +63,7 @@ public class BundleContentLoaderTest {
 
         ContentReaderWhiteboard whiteboard = context.getService(ContentReaderWhiteboard.class);
 
-        contentLoader = new BundleContentLoader(bundleHelper, whiteboard);
+        contentLoader = new BundleContentLoader(bundleHelper, whiteboard, Collections.singleton("seed"));
     }
 
 
@@ -75,6 +78,31 @@ public class BundleContentLoaderTest {
 
         assertThat("Resource was not imported", imported, notNullValue());
         assertThat("sling:resourceType was not properly set", imported.getResourceType(), equalTo("sling:Folder"));
+    }
+
+
+    @Test
+    public void skippedRunmode() throws Exception {
+        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app/skipped;path:=/libs/app/skipped;skipRunmode:=seed");
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+        Resource imported = context.resourceResolver().getResource("/libs/app/skipped");
+        assertThat("Import should have been skipped", imported, nullValue());
+    }
+
+    @Test
+    public void passedRunmode() throws Exception {
+        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app/passed;path:=/libs/app/passed;skipRunmode:=runtime");
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+        Resource imported = context.resourceResolver().getResource("/libs/app/passed");
+        assertThat("Resource was not imported", imported, notNullValue());
+    }
+
+    @Test
+    public void emptyRunmode() throws Exception {
+        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app/empty;path:=/libs/app/empty");
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+        Resource imported = context.resourceResolver().getResource("/libs/app/empty");
+        assertThat("Resource was not imported", imported, notNullValue());
     }
 
     @Test

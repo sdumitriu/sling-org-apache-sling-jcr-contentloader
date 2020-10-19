@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 import javax.jcr.Item;
@@ -62,10 +63,13 @@ public class BundleContentLoader extends BaseImportLoader {
     // bundles whose registration failed and should be retried
     private List<Bundle> delayedBundles;
 
-    public BundleContentLoader(BundleHelper bundleHelper, ContentReaderWhiteboard contentReaderWhiteboard) {
+    private Set<String> runmodes;
+
+    public BundleContentLoader(BundleHelper bundleHelper, ContentReaderWhiteboard contentReaderWhiteboard, Set<String> runmodes) {
         super(contentReaderWhiteboard);
         this.bundleHelper = bundleHelper;
         this.delayedBundles = new LinkedList<>();
+        this.runmodes = runmodes;
     }
 
     public void dispose() {
@@ -215,7 +219,7 @@ public class BundleContentLoader extends BaseImportLoader {
         try {
             while (pathIter.hasNext()) {
                 final PathEntry pathEntry = pathIter.next();
-                if (!contentAlreadyLoaded || pathEntry.isOverwrite()) {
+                if (validRunmode(pathEntry) && (!contentAlreadyLoaded || pathEntry.isOverwrite())) {
                     String workspace = pathEntry.getWorkspace();
                     final Session targetSession;
                     if (workspace != null) {
@@ -290,13 +294,25 @@ public class BundleContentLoader extends BaseImportLoader {
     }
 
     /**
+     * Checks if the path entry has a runmode restriction set and the runmode isn't set in the Sling instance.
+     * 
+     * @param pathEntry the path entry to check
+     * @return true if the required runmode setting is not set or the instance runmodes doesn't contain the runmode
+     */
+    private boolean validRunmode(PathEntry pathEntry) {
+        return pathEntry.getSkipRunmode() == null || "".equals(pathEntry.getSkipRunmode())
+            || !runmodes.contains(pathEntry.getSkipRunmode());
+    }
+
+    /**
      * Handle content installation for a single path.
      *
      * @param bundle        The bundle containing the content.
      * @param path          The path
      * @param configuration
      * @param parent        The parent node.
-     * @param createdNodes  An optional list to store all new nodes. This list is used for an uninstall
+     * @param createdNodes  An optional list to store all new nodes. This list is
+     *                      used for an uninstall
      * @throws RepositoryException
      */
     private void installFromPath(final Bundle bundle, final String path, final PathEntry configuration, final Node parent, final List<String> createdNodes, final DefaultContentCreator contentCreator) throws RepositoryException {
