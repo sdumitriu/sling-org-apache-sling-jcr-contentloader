@@ -98,8 +98,17 @@ public class BundleContentLoaderTest {
     }
 
     @Test
-    public void emptyRunmode() throws Exception {
+    public void nullRunmode() throws Exception {
         Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app/empty;path:=/libs/app/empty");
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+        Resource imported = context.resourceResolver().getResource("/libs/app/empty");
+        assertThat("Resource was not imported", imported, notNullValue());
+    }
+
+
+    @Test
+    public void emptyRunmode() throws Exception {
+        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app/empty;path:=/libs/app/empty;skipRunmode:=");
         contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
         Resource imported = context.resourceResolver().getResource("/libs/app/empty");
         assertThat("Resource was not imported", imported, notNullValue());
