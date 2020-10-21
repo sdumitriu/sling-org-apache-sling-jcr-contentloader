@@ -18,10 +18,10 @@
  */
 package org.apache.sling.jcr.contentloader.internal;
 
-import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.BUNDLE_CONTENT_NODE;
-import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.PROPERTY_CONTENT_LOADED;
-import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.PROPERTY_CONTENT_LOADED_AT;
-import static org.apache.sling.jcr.contentloader.internal.ContentLoaderService.PROPERTY_UNINSTALL_PATHS;
+import static org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener.BUNDLE_CONTENT_NODE;
+import static org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener.PROPERTY_CONTENT_LOADED;
+import static org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener.PROPERTY_CONTENT_LOADED_AT;
+import static org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener.PROPERTY_UNINSTALL_PATHS;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -53,7 +53,7 @@ import org.osgi.framework.BundleEvent;
 
 import junitx.util.PrivateAccessor;
 
-public class ContentLoaderServiceTest {
+public class BundleContentLoaderListenerTest {
 
     @Rule
     public final SlingContext context = new SlingContext(ResourceResolverType.JCR_OAK);
@@ -61,7 +61,7 @@ public class ContentLoaderServiceTest {
     @Rule
     public ExpectedException thrown = ExpectedException.none();
 
-    private ContentLoaderService underTest;
+    private BundleContentLoaderListener underTest;
     private BundleContentLoader contentLoader;
     private Session session;
 
@@ -73,13 +73,13 @@ public class ContentLoaderServiceTest {
         session = context.resourceResolver().adaptTo(Session.class);
 
         // register the content loader service
-        underTest = context.registerInjectActivateService(new ContentLoaderService());
+        underTest = context.registerInjectActivateService(new BundleContentLoaderListener());
         contentLoader = (BundleContentLoader) PrivateAccessor.getField(underTest, "bundleContentLoader");
     }
 
-    //-------ContentLoaderService#bundleChanged(BundleEvent)-------//
+    //-------BundleContentLoaderListener#bundleChanged(BundleEvent)-------//
     //I'm not very sure how to test this method, it looks like side effect of this method goes very deep
-    //And more affects BundleContentLoader than ContentLoaderService
+    //And more affects BundleContentLoader than BundleContentLoaderListener
 
     @Test
     public void testBundleResolvedBundleChanged() throws NoSuchFieldException, RepositoryException {
@@ -103,12 +103,12 @@ public class ContentLoaderServiceTest {
         underTest.bundleChanged(new BundleEvent(BundleEvent.UNINSTALLED, bundle));
     }
 
-    //-------ContentLoaderService#bundleChanged(BundleEvent)-------//
+    //-------BundleContentLoaderListener#bundleChanged(BundleEvent)-------//
 
     @Test
     public void getContentInfoFromLockedNode() throws RepositoryException {
         final Bundle bundle = createNewBundle();
-        final Node bcNode = (Node)session.getItem(ContentLoaderService.BUNDLE_CONTENT_NODE);
+        final Node bcNode = (Node)session.getItem(BundleContentLoaderListener.BUNDLE_CONTENT_NODE);
         bcNode.addNode(bundle.getSymbolicName()).addMixin("mix:lockable");
         session.save();
         LockManager lockManager = session.getWorkspace().getLockManager();
@@ -124,7 +124,7 @@ public class ContentLoaderServiceTest {
     @Test
     public void getContentInfoFromNotLockableNode() throws RepositoryException {
         final Bundle bundle = createNewBundle();
-        final Node bcNode = (Node)session.getItem(ContentLoaderService.BUNDLE_CONTENT_NODE);
+        final Node bcNode = (Node)session.getItem(BundleContentLoaderListener.BUNDLE_CONTENT_NODE);
         bcNode.addNode(bundle.getSymbolicName()); //Node without lockable mixin
         session.save();
 
@@ -134,7 +134,7 @@ public class ContentLoaderServiceTest {
     @Test
     public void getContentInfo() throws RepositoryException {
         final Bundle bundle = createNewBundle();
-        final Node bcNode = (Node)session.getItem(ContentLoaderService.BUNDLE_CONTENT_NODE);
+        final Node bcNode = (Node)session.getItem(BundleContentLoaderListener.BUNDLE_CONTENT_NODE);
         final Node bundleContent = bcNode.addNode(bundle.getSymbolicName());
         bundleContent.addMixin("mix:lockable");
 
@@ -156,7 +156,7 @@ public class ContentLoaderServiceTest {
         assertTrue(props.containsKey(PROPERTY_UNINSTALL_PATHS));
     }
 
-    //-------ContentLoaderService#contentIsUninstalled(Session, Bundle)-------//
+    //-------BundleContentLoaderListener#contentIsUninstalled(Session, Bundle)-------//
 
     @Test
     public void testContentIsUninstalled() throws RepositoryException {
@@ -171,14 +171,14 @@ public class ContentLoaderServiceTest {
         assertFalse(bcNode.getProperty(PROPERTY_CONTENT_LOADED).getBoolean());
     }
 
-    //-------ContentLoaderService#getMimeType(String)-------//
+    //-------BundleContentLoaderListener#getMimeType(String)-------//
 
     @Test
     public void testMimeTypeService(){
         assertEquals("audio/mpeg", underTest.getMimeType("test.mp3"));
     }
 
-    //-------ContentLoaderService#getMimeType(String)-------//
+    //-------BundleContentLoaderListener#getMimeType(String)-------//
 
     @Test
     public void getSessionForWorkspace() throws RepositoryException {

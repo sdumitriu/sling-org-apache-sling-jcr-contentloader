@@ -21,7 +21,10 @@ package org.apache.sling.jcr.contentloader.internal;
 import static java.util.Collections.singletonMap;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.junit.Assert.assertThat;
+
+import java.lang.annotation.Annotation;
 
 import javax.jcr.Session;
 
@@ -43,7 +46,9 @@ public class BundleContentLoaderTest {
     @Rule
     public final SlingContext context = new SlingContext(ResourceResolverType.JCR_OAK);
 
-    private BundleContentLoader contentLoader;
+    private BundleContentLoaderListener bundleHelper;
+
+    private ContentReaderWhiteboard whiteboard;
 
     @Before
     public void prepareContentLoader() throws Exception {
@@ -56,16 +61,16 @@ public class BundleContentLoaderTest {
         context.registerInjectActivateService(new ContentReaderWhiteboard());
 
         // register the content loader service
-        BundleHelper bundleHelper = context.registerInjectActivateService(new ContentLoaderService());
+        bundleHelper = context.registerInjectActivateService(new BundleContentLoaderListener());
 
-        ContentReaderWhiteboard whiteboard = context.getService(ContentReaderWhiteboard.class);
+        whiteboard = context.getService(ContentReaderWhiteboard.class);
 
-        contentLoader = new BundleContentLoader(bundleHelper, whiteboard);
     }
-
 
     @Test
     public void loadContentWithSpecificPath() throws Exception {
+
+        BundleContentLoader contentLoader = new BundleContentLoader(bundleHelper, whiteboard, null);
 
         Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app;path:=/libs/app");
 
@@ -78,7 +83,101 @@ public class BundleContentLoaderTest {
     }
 
     @Test
+    public void loadContentWithExcludes() throws Exception {
+
+        BundleContentLoader contentLoader = new BundleContentLoader(bundleHelper, whiteboard,
+                new BundleContentLoaderConfiguration() {
+                    @Override
+                    public Class<? extends Annotation> annotationType() {
+                        return null;
+                    }
+
+                    @Override
+                    public String[] includedTargets() {
+                        return new String[] { "^/.*$" };
+                    }
+
+                    @Override
+                    public String[] excludedTargets() {
+                        return new String[] { "^/libs.*$" };
+                    }
+
+                });
+
+        Bundle mockBundle = newBundleWithInitialContent(
+                "SLING-INF/libs/app;path:=/libs/app,SLING-INF/content/app;path:=/content/app");
+
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+
+        assertThat("Excluded resource imported", context.resourceResolver().getResource("/libs/app"), nullValue());
+    }
+
+
+    @Test
+    public void loadContentWithNullValue() throws Exception {
+
+        BundleContentLoader contentLoader = new BundleContentLoader(bundleHelper, whiteboard,
+                new BundleContentLoaderConfiguration() {
+                    @Override
+                    public Class<? extends Annotation> annotationType() {
+                        return null;
+                    }
+
+                    @Override
+                    public String[] includedTargets() {
+                        return new String[] { "^/.*$" };
+                    }
+
+                    @Override
+                    public String[] excludedTargets() {
+                        return null;
+                    }
+
+                });
+
+        Bundle mockBundle = newBundleWithInitialContent(
+                "SLING-INF/libs/app;path:=/libs/app,SLING-INF/content/app;path:=/content/app");
+
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+
+        assertThat("Excluded resource imported", context.resourceResolver().getResource("/libs/app"), notNullValue());
+    }
+
+
+    @Test
+    public void loadContentWithIncludes() throws Exception {
+
+        BundleContentLoader contentLoader = new BundleContentLoader(bundleHelper, whiteboard,
+                new BundleContentLoaderConfiguration() {
+                    @Override
+                    public Class<? extends Annotation> annotationType() {
+                        return null;
+                    }
+
+                    @Override
+                    public String[] includedTargets() {
+                        return new String[] { "^/.*$" };
+                    }
+
+                    @Override
+                    public String[] excludedTargets() {
+                        return new String[] { "^/app.*$" };
+                    }
+
+                });
+
+        Bundle mockBundle = newBundleWithInitialContent(
+                "SLING-INF/libs/app;path:=/libs/app");
+
+        contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
+
+        assertThat("Included resource not imported", context.resourceResolver().getResource("/libs/app"), notNullValue());
+    }
+
+    @Test
     public void loadContentWithRootPath() throws Exception {
+
+        BundleContentLoader contentLoader = new BundleContentLoader(bundleHelper, whiteboard, null);
 
         Bundle mockBundle = newBundleWithInitialContent("SLING-INF/");
 
@@ -94,9 +193,12 @@ public class BundleContentLoaderTest {
     @Ignore("TODO - unregister or somehow ignore the XmlReader component for this test")
     public void loadXmlAsIs() throws Exception {
 
+        BundleContentLoader contentLoader = new BundleContentLoader(bundleHelper, whiteboard, null);
+
         dumpRepo("/", 2);
 
-        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app;path:=/libs/app;ignoreImportProviders:=xml");
+        Bundle mockBundle = newBundleWithInitialContent(
+                "SLING-INF/libs/app;path:=/libs/app;ignoreImportProviders:=xml");
 
         contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
 
@@ -120,27 +222,25 @@ public class BundleContentLoaderTest {
         return mockBundle;
     }
 
-
     private void dumpRepo(String startPath, int maxDepth) {
 
         dumpRepo0(startPath, maxDepth, 0);
     }
 
-
     private void dumpRepo0(String startPath, int maxDepth, int currentDepth) {
         Resource resource = context.resourceResolver().getResource(startPath);
         StringBuilder format = new StringBuilder();
-        for ( int i = 0 ;i  < currentDepth ; i++) {
+        for (int i = 0; i < currentDepth; i++) {
             format.append("  ");
         }
         format.append("%s [%s]%n");
-        String name = resource.getName().length() == 0  ? "/" : resource.getName();
+        String name = resource.getName().length() == 0 ? "/" : resource.getName();
         System.out.format(format.toString(), name, resource.getResourceType());
         currentDepth++;
-        if ( currentDepth > maxDepth) {
+        if (currentDepth > maxDepth) {
             return;
         }
-        for ( Resource child : resource.getChildren() ) {
+        for (Resource child : resource.getChildren()) {
             dumpRepo0(child.getPath(), maxDepth, currentDepth);
         }
     }

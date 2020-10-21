@@ -31,7 +31,7 @@ import org.apache.felix.hc.api.HealthCheck;
 import org.apache.felix.hc.api.Result;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.jcr.contentloader.internal.BundleHelper;
-import org.apache.sling.jcr.contentloader.internal.ContentLoaderService;
+import org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener;
 import org.apache.sling.jcr.contentloader.internal.PathEntry;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -117,7 +117,7 @@ public class BundleContentLoadedCheck implements HealthCheck {
         try {
             metadataSession = repository.loginService(null, null);
             
-            BundleHelper bundleHelper = new ContentLoaderService();
+            BundleHelper bundleHelper = new BundleContentLoaderListener();
             
             for (Bundle bundle : bundles) {
                 String bundleSymbolicName = bundle.getSymbolicName();
@@ -155,9 +155,9 @@ public class BundleContentLoadedCheck implements HealthCheck {
                         }
                     } else {
                         try {
-                            final boolean contentAlreadyLoaded = ((Boolean) bundleContentInfo.get(ContentLoaderService.PROPERTY_CONTENT_LOADED)).booleanValue();
+                            final boolean contentAlreadyLoaded = ((Boolean) bundleContentInfo.get(BundleContentLoaderListener.PROPERTY_CONTENT_LOADED)).booleanValue();
                             boolean isBundleUpdated = false;
-                            Calendar lastLoadedAt = (Calendar) bundleContentInfo.get(ContentLoaderService.PROPERTY_CONTENT_LOADED_AT);
+                            Calendar lastLoadedAt = (Calendar) bundleContentInfo.get(BundleContentLoaderListener.PROPERTY_CONTENT_LOADED_AT);
                             if (lastLoadedAt != null && lastLoadedAt.getTimeInMillis() < bundle.getLastModified()) {
                                 isBundleUpdated = true;
                             }
