@@ -455,7 +455,6 @@ public class DefaultContentCreator implements ContentCreator {
         cleanUpNode(node);
         // resolve REFERENCE property values pointing to this node
         resolveReferences(node);
-        node.getSession().save();
     }
 
     private void cleanUpNode(Node node) throws RepositoryException {
