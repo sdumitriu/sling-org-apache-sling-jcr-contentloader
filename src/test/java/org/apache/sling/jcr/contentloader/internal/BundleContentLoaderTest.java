@@ -67,7 +67,7 @@ public class BundleContentLoaderTest {
     @Test
     public void loadContentWithSpecificPath() throws Exception {
 
-        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app;path:=/libs/app");
+        Bundle mockBundle = newBundleWithInitialContent(context, "SLING-INF/libs/app;path:=/libs/app");
 
         contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
 
@@ -80,7 +80,7 @@ public class BundleContentLoaderTest {
     @Test
     public void loadContentWithRootPath() throws Exception {
 
-        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/");
+        Bundle mockBundle = newBundleWithInitialContent(context, "SLING-INF/");
 
         contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
 
@@ -96,7 +96,7 @@ public class BundleContentLoaderTest {
 
         dumpRepo("/", 2);
 
-        Bundle mockBundle = newBundleWithInitialContent("SLING-INF/libs/app;path:=/libs/app;ignoreImportProviders:=xml");
+        Bundle mockBundle = newBundleWithInitialContent(context, "SLING-INF/libs/app;path:=/libs/app;ignoreImportProviders:=xml");
 
         contentLoader.registerBundle(context.resourceResolver().adaptTo(Session.class), mockBundle, false);
 
@@ -113,8 +113,7 @@ public class BundleContentLoaderTest {
 
     }
 
-    private MockBundle newBundleWithInitialContent(String initialContentHeader) {
-
+    public static MockBundle newBundleWithInitialContent(SlingContext context, String initialContentHeader) {
         MockBundle mockBundle = new MockBundle(context.bundleContext());
         mockBundle.setHeaders(singletonMap("Sling-Initial-Content", initialContentHeader));
         return mockBundle;

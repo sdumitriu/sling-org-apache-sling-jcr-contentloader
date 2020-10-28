@@ -92,7 +92,7 @@ public class BundleContentLoadedCheck implements HealthCheck {
     private SlingRepository repository;
 
     @Activate
-    protected void activate(BundleContext bundleContext, Config config) {
+    public void activate(BundleContext bundleContext, Config config) {
         this.bundleContext = bundleContext;
         this.includesRegex = Pattern.compile(config.includesRegex());
         String excludesRegex2 = config.excludesRegex();
