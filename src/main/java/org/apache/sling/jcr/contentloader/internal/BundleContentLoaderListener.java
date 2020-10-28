@@ -43,25 +43,26 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.SynchronousBundleListener;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The <code>ContentLoaderService</code> is the service
- * providing the following functionality:
+ * The <code>BundleContentLoaderListener</code> is the service providing the
+ * following functionality:
  * <ul>
  * <li>Bundle listener to load and unload initial content.
  * </ul>
  *
  */
-@Component(service = {},
-    property = {
-            Constants.SERVICE_VENDOR + "=The Apache Software Foundation",
-            Constants.SERVICE_DESCRIPTION + "=Apache Sling Content Loader Implementation"
-    })
-public class ContentLoaderService implements SynchronousBundleListener, BundleHelper {
+@Component(service = {}, property = { Constants.SERVICE_VENDOR + "=The Apache Software Foundation",
+        Constants.SERVICE_DESCRIPTION
+                + "=Apache Sling Content Loader Implementation" }, configurationPolicy = ConfigurationPolicy.OPTIONAL)
+@Designate(ocd = BundleContentLoaderConfiguration.class, factory = false)
+public class BundleContentLoaderListener implements SynchronousBundleListener, BundleHelper {
 
     public static final String PROPERTY_CONTENT_LOADED = "content-loaded";
     public static final String PROPERTY_CONTENT_LOADED_AT = "content-load-time";
@@ -82,8 +83,8 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     private SlingRepository repository;
 
     /**
-     * The MimeTypeService used by the bundle content loader to
-     * resolve MIME types for files to be installed.
+     * The MimeTypeService used by the bundle content loader to resolve MIME types
+     * for files to be installed.
      */
     @Reference
     private MimeTypeService mimeTypeService;
@@ -95,8 +96,8 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     private ContentReaderWhiteboard contentReaderWhiteboard;
 
     /**
-     * The initial content loader which is called to load initial content up
-     * into the repository when the providing bundle is installed.
+     * The initial content loader which is called to load initial content up into
+     * the repository when the providing bundle is installed.
      */
     private BundleContentLoader bundleContentLoader;
 
@@ -117,12 +118,12 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     // ---------- BundleListener -----------------------------------------------
 
     /**
-     * Loads and unloads any content provided by the bundle whose state
-     * changed. If the bundle has been started, the content is loaded. If
-     * the bundle is about to stop, the content are unloaded.
+     * Loads and unloads any content provided by the bundle whose state changed. If
+     * the bundle has been started, the content is loaded. If the bundle is about to
+     * stop, the content are unloaded.
      *
      * @param event The <code>BundleEvent</code> representing the bundle state
-     *            change.
+     *              change.
      */
     @Override
     public synchronized void bundleChanged(BundleEvent event) {
@@ -149,10 +150,8 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
                     isUpdate = this.updatedBundles.remove(bundle.getSymbolicName());
                     bundleContentLoader.registerBundle(session, bundle, isUpdate);
                 } catch (Exception t) {
-                    log.error(
-                        "bundleChanged: Problem loading initial content of bundle "
-                            + bundle.getSymbolicName() + " ("
-                            + bundle.getBundleId() + ")", t);
+                    log.error("bundleChanged: Problem loading initial content of bundle " + bundle.getSymbolicName()
+                            + " (" + bundle.getBundleId() + ")", t);
                 } finally {
                     this.ungetSession(session);
                 }
@@ -167,10 +166,8 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
                     session = this.getSession();
                     bundleContentLoader.unregisterBundle(session, bundle);
                 } catch (Exception t) {
-                    log.error(
-                        "bundleChanged: Problem unloading initial content of bundle "
-                            + bundle.getSymbolicName() + " ("
-                            + bundle.getBundleId() + ")", t);
+                    log.error("bundleChanged: Problem unloading initial content of bundle " + bundle.getSymbolicName()
+                            + " (" + bundle.getBundleId() + ")", t);
                 } finally {
                     this.ungetSession(session);
                 }
@@ -192,16 +189,16 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
 
     @Override
     public void createRepositoryPath(final Session writerSession, final String repositoryPath)
-    throws RepositoryException {
-        if ( !writerSession.itemExists(repositoryPath) ) {
+            throws RepositoryException {
+        if (!writerSession.itemExists(repositoryPath)) {
             Node node = writerSession.getRootNode();
             String path = repositoryPath.substring(1);
             int pos = path.lastIndexOf('/');
-            if ( pos != -1 ) {
+            if (pos != -1) {
                 final StringTokenizer st = new StringTokenizer(path.substring(0, pos), "/");
-                while ( st.hasMoreTokens() ) {
+                while (st.hasMoreTokens()) {
                     final String token = st.nextToken();
-                    if ( !node.hasNode(token) ) {
+                    if (!node.hasNode(token)) {
                         node.addNode(token, "sling:Folder");
                         writerSession.save();
                     }
@@ -209,7 +206,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
                 }
                 path = path.substring(pos + 1);
             }
-            if ( !node.hasNode(path) ) {
+            if (!node.hasNode(path)) {
                 node.addNode(path, "sling:Folder");
                 writerSession.save();
             }
@@ -220,9 +217,9 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
 
     /** Activates this component, called by SCR before registering as a service */
     @Activate
-    protected synchronized void activate(BundleContext bundleContext) {
+    protected synchronized void activate(BundleContext bundleContext, BundleContentLoaderConfiguration configuration) {
         this.slingId = this.settingsService.getSlingId();
-        this.bundleContentLoader = new BundleContentLoader(this, contentReaderWhiteboard);
+        this.bundleContentLoader = new BundleContentLoader(this, contentReaderWhiteboard, configuration);
 
         bundleContext.addBundleListener(this);
 
@@ -230,8 +227,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
         try {
             session = this.getSession();
             this.createRepositoryPath(session, BUNDLE_CONTENT_NODE);
-            log.debug(
-                    "Activated - attempting to load content from all "
+            log.debug("Activated - attempting to load content from all "
                     + "bundles which are neither INSTALLED nor UNINSTALLED");
 
             int ignored = 0;
@@ -247,29 +243,25 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
 
             }
 
-            log.debug(
-                    "Out of {} bundles, {} were not in a suitable state for initial content loading",
-                    bundles.length, ignored
-                    );
+            log.debug("Out of {} bundles, {} were not in a suitable state for initial content loading", bundles.length,
+                    ignored);
 
         } catch (Exception t) {
             log.error("activate: Problem while loading initial content and"
-                + " registering mappings for existing bundles", t);
+                    + " registering mappings for existing bundles", t);
         } finally {
             this.ungetSession(session);
         }
     }
-    
+
     private void loadBundle(Bundle bundle, Session session) throws RepositoryException {
         try {
             bundleContentLoader.registerBundle(session, bundle, false);
         } catch (Exception t) {
-            log.error(
-                "Problem loading initial content of bundle "
-                    + bundle.getSymbolicName() + " ("
+            log.error("Problem loading initial content of bundle " + bundle.getSymbolicName() + " ("
                     + bundle.getBundleId() + ")", t);
         } finally {
-            if ( session.hasPendingChanges() ) {
+            if (session.hasPendingChanges()) {
                 session.refresh(false);
             }
         }
@@ -280,7 +272,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     protected synchronized void deactivate(BundleContext bundleContext) {
         bundleContext.removeBundleListener(this);
 
-        if ( this.bundleContentLoader != null ) {
+        if (this.bundleContentLoader != null) {
             this.bundleContentLoader.dispose();
             this.bundleContentLoader = null;
         }
@@ -297,8 +289,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
      * Returns an administrative session to the default workspace.
      */
     @Override
-    public Session getSession()
-    throws RepositoryException {
+    public Session getSession() throws RepositoryException {
         return getRepository().loginService(null, null);
     }
 
@@ -314,7 +305,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
      * Return the administrative session and close it.
      */
     private void ungetSession(final Session session) {
-        if ( session != null ) {
+        if (session != null) {
             try {
                 session.logout();
             } catch (Exception t) {
@@ -325,6 +316,7 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
 
     /**
      * Return the bundle content info and make an exclusive lock.
+     * 
      * @param session
      * @param bundle
      * @return The map of bundle content info or null.
@@ -332,11 +324,11 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
      */
     @Override
     public Map<String, Object> getBundleContentInfo(final Session session, final Bundle bundle, boolean create)
-    throws RepositoryException {
+            throws RepositoryException {
         final String nodeName = bundle.getSymbolicName();
-        final Node parentNode = (Node)session.getItem(BUNDLE_CONTENT_NODE);
-        if ( !parentNode.hasNode(nodeName) ) {
-            if ( !create ) {
+        final Node parentNode = (Node) session.getItem(BUNDLE_CONTENT_NODE);
+        if (!parentNode.hasNode(nodeName)) {
+            if (!create) {
                 return null;
             }
             try {
@@ -350,33 +342,31 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
             }
         }
         final Node bcNode = parentNode.getNode(nodeName);
-        if ( bcNode.isLocked() ) {
+        if (bcNode.isLocked()) {
             return null;
         }
         try {
-        	LockManager lockManager = session.getWorkspace().getLockManager();
-        	lockManager.lock(bcNode.getPath(), 
-        			false, // isDeep 
-        			true, // isSessionScoped 
-        			Long.MAX_VALUE, // timeoutHint 
-        			null); // ownerInfo
+            LockManager lockManager = session.getWorkspace().getLockManager();
+            lockManager.lock(bcNode.getPath(), false, // isDeep
+                    true, // isSessionScoped
+                    Long.MAX_VALUE, // timeoutHint
+                    null); // ownerInfo
         } catch (LockException le) {
             return null;
         }
         final Map<String, Object> info = new HashMap<>();
-        if ( bcNode.hasProperty(PROPERTY_CONTENT_LOADED_AT)) {
+        if (bcNode.hasProperty(PROPERTY_CONTENT_LOADED_AT)) {
             info.put(PROPERTY_CONTENT_LOADED_AT, bcNode.getProperty(PROPERTY_CONTENT_LOADED_AT).getDate());
         }
-        if ( bcNode.hasProperty(PROPERTY_CONTENT_LOADED) ) {
-            info.put(PROPERTY_CONTENT_LOADED,
-                bcNode.getProperty(PROPERTY_CONTENT_LOADED).getBoolean());
+        if (bcNode.hasProperty(PROPERTY_CONTENT_LOADED)) {
+            info.put(PROPERTY_CONTENT_LOADED, bcNode.getProperty(PROPERTY_CONTENT_LOADED).getBoolean());
         } else {
             info.put(PROPERTY_CONTENT_LOADED, false);
         }
-        if ( bcNode.hasProperty(PROPERTY_UNINSTALL_PATHS) ) {
+        if (bcNode.hasProperty(PROPERTY_UNINSTALL_PATHS)) {
             final Value[] values = bcNode.getProperty(PROPERTY_UNINSTALL_PATHS).getValues();
             final String[] s = new String[values.length];
-            for(int i=0; i<values.length; i++) {
+            for (int i = 0; i < values.length; i++) {
                 s[i] = values[i].getString();
             }
             info.put(PROPERTY_UNINSTALL_PATHS, s);
@@ -385,41 +375,37 @@ public class ContentLoaderService implements SynchronousBundleListener, BundleHe
     }
 
     @Override
-    public void unlockBundleContentInfo(final Session session,
-                                        final Bundle  bundle,
-                                        final boolean contentLoaded,
-                                        final List<String> createdNodes)
-    throws RepositoryException {
+    public void unlockBundleContentInfo(final Session session, final Bundle bundle, final boolean contentLoaded,
+            final List<String> createdNodes) throws RepositoryException {
         final String nodeName = bundle.getSymbolicName();
-        final Node parentNode = (Node)session.getItem(BUNDLE_CONTENT_NODE);
+        final Node parentNode = (Node) session.getItem(BUNDLE_CONTENT_NODE);
         final Node bcNode = parentNode.getNode(nodeName);
-        if ( contentLoaded ) {
+        if (contentLoaded) {
             bcNode.setProperty(PROPERTY_CONTENT_LOADED, contentLoaded);
             bcNode.setProperty(PROPERTY_CONTENT_LOADED_AT, Calendar.getInstance());
             bcNode.setProperty(PROPERTY_CONTENT_LOADED_BY, this.slingId);
-            bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_AT, (String)null);
-            bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_BY, (String)null);
-            if ( createdNodes != null && !createdNodes.isEmpty() ) {
+            bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_AT, (String) null);
+            bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_BY, (String) null);
+            if (createdNodes != null && !createdNodes.isEmpty()) {
                 bcNode.setProperty(PROPERTY_UNINSTALL_PATHS, createdNodes.toArray(new String[createdNodes.size()]));
             }
             session.save();
         }
         LockManager lockManager = session.getWorkspace().getLockManager();
-		lockManager.unlock(bcNode.getPath());
+        lockManager.unlock(bcNode.getPath());
     }
 
     @Override
-    public void contentIsUninstalled(final Session session,
-                                     final Bundle  bundle) {
+    public void contentIsUninstalled(final Session session, final Bundle bundle) {
         final String nodeName = bundle.getSymbolicName();
         try {
-            final Node parentNode = (Node)session.getItem(BUNDLE_CONTENT_NODE);
-            if ( parentNode.hasNode(nodeName) ) {
+            final Node parentNode = (Node) session.getItem(BUNDLE_CONTENT_NODE);
+            if (parentNode.hasNode(nodeName)) {
                 final Node bcNode = parentNode.getNode(nodeName);
                 bcNode.setProperty(PROPERTY_CONTENT_LOADED, false);
                 bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_AT, Calendar.getInstance());
                 bcNode.setProperty(PROPERTY_CONTENT_UNLOADED_BY, this.slingId);
-                bcNode.setProperty(PROPERTY_UNINSTALL_PATHS, (String[])null);
+                bcNode.setProperty(PROPERTY_UNINSTALL_PATHS, (String[]) null);
                 session.save();
             }
         } catch (RepositoryException re) {
