@@ -29,9 +29,9 @@ import org.apache.felix.hc.api.Result;
 import org.apache.sling.jcr.contentloader.hc.BundleContentLoadedCheck;
 import org.apache.sling.jcr.contentloader.hc.BundleContentLoadedCheck.Config;
 import org.apache.sling.jcr.contentloader.internal.BundleContentLoader;
+import org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener;
 import org.apache.sling.jcr.contentloader.internal.BundleContentLoaderTest;
 import org.apache.sling.jcr.contentloader.internal.BundleHelper;
-import org.apache.sling.jcr.contentloader.internal.ContentLoaderService;
 import org.apache.sling.jcr.contentloader.internal.ContentReaderWhiteboard;
 import org.apache.sling.jcr.contentloader.internal.readers.JsonReader;
 import org.apache.sling.jcr.contentloader.internal.readers.XmlReader;
@@ -69,11 +69,11 @@ public class BundleContentLoadedCheckTest {
         context.registerInjectActivateService(new ContentReaderWhiteboard());
 
         // register the content loader service
-        BundleHelper bundleHelper = context.registerInjectActivateService(new ContentLoaderService());
+        BundleHelper bundleHelper = context.registerInjectActivateService(new BundleContentLoaderListener());
 
         ContentReaderWhiteboard whiteboard = context.getService(ContentReaderWhiteboard.class);
 
-        contentLoader = new BundleContentLoader(bundleHelper, whiteboard);
+        contentLoader = new BundleContentLoader(bundleHelper, whiteboard, null);
 
         BundleContext bundleContext = mock.mock(BundleContext.class);
         mock.checking(new Expectations() {

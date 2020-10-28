@@ -25,6 +25,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -33,7 +34,12 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.StringTokenizer;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.jcr.Item;
 import javax.jcr.NoSuchWorkspaceException;
@@ -62,10 +68,31 @@ public class BundleContentLoader extends BaseImportLoader {
     // bundles whose registration failed and should be retried
     private List<Bundle> delayedBundles;
 
-    public BundleContentLoader(BundleHelper bundleHelper, ContentReaderWhiteboard contentReaderWhiteboard) {
+    private final Predicate<String> pathFilter;
+
+    public BundleContentLoader(BundleHelper bundleHelper, ContentReaderWhiteboard contentReaderWhiteboard,
+            BundleContentLoaderConfiguration configuration) {
         super(contentReaderWhiteboard);
         this.bundleHelper = bundleHelper;
         this.delayedBundles = new LinkedList<>();
+
+        List<Pattern> includes = Arrays
+                .stream(Optional.ofNullable(configuration).map(BundleContentLoaderConfiguration::includedTargets)
+                        .orElse(new String[0]))
+                .filter(Objects::nonNull).map(Pattern::compile).collect(Collectors.toList());
+        List<Pattern> excludes = Arrays
+                .stream(Optional.ofNullable(configuration).map(BundleContentLoaderConfiguration::excludedTargets)
+                        .orElse(new String[0]))
+                .filter(Objects::nonNull).map(Pattern::compile).collect(Collectors.toList());
+        this.pathFilter = path -> {
+            if (configuration == null || path == null) {
+                return true;
+            } else {
+                return includes.stream().anyMatch(p -> p.matcher(path).matches())
+                        && excludes.stream().noneMatch(p -> p.matcher(path).matches());
+            }
+        };
+        log.debug("Using includes: {} and excludes: {}", includes, excludes);
     }
 
     public void dispose() {
@@ -95,8 +122,9 @@ public class BundleContentLoader extends BaseImportLoader {
         if (registerBundleInternal(metadataSession, bundle, false, isUpdate)) {
             // handle delayed bundles, might help now
             int currentSize = -1;
-            for (int i = delayedBundles.size(); i > 0 && currentSize != delayedBundles.size() && !delayedBundles.isEmpty(); i--) {
-                for (Iterator<Bundle> di = delayedBundles.iterator(); di.hasNext(); ) {
+            for (int i = delayedBundles.size(); i > 0 && currentSize != delayedBundles.size()
+                    && !delayedBundles.isEmpty(); i--) {
+                for (Iterator<Bundle> di = delayedBundles.iterator(); di.hasNext();) {
                     Bundle delayed = di.next();
                     if (registerBundleInternal(metadataSession, delayed, true, false)) {
                         di.remove();
@@ -110,7 +138,8 @@ public class BundleContentLoader extends BaseImportLoader {
         }
     }
 
-    private boolean registerBundleInternal(final Session metadataSession, final Bundle bundle, final boolean isRetry, final boolean isUpdate) {
+    private boolean registerBundleInternal(final Session metadataSession, final Bundle bundle, final boolean isRetry,
+            final boolean isUpdate) {
 
         // check if bundle has initial content
         final Iterator<PathEntry> pathIter = PathEntry.getContentPaths(bundle);
@@ -120,10 +149,11 @@ public class BundleContentLoader extends BaseImportLoader {
         }
 
         try {
-            bundleHelper.createRepositoryPath(metadataSession, ContentLoaderService.BUNDLE_CONTENT_NODE);
+            bundleHelper.createRepositoryPath(metadataSession, BundleContentLoaderListener.BUNDLE_CONTENT_NODE);
 
             // check if the content has already been loaded
-            final Map<String, Object> bundleContentInfo = bundleHelper.getBundleContentInfo(metadataSession, bundle, true);
+            final Map<String, Object> bundleContentInfo = bundleHelper.getBundleContentInfo(metadataSession, bundle,
+                    true);
 
             // if we don't get an info, someone else is currently loading
             if (bundleContentInfo == null) {
@@ -133,16 +163,19 @@ public class BundleContentLoader extends BaseImportLoader {
             boolean success = false;
             List<String> createdNodes = null;
             try {
-                final boolean contentAlreadyLoaded = ((Boolean) bundleContentInfo.get(ContentLoaderService.PROPERTY_CONTENT_LOADED)).booleanValue();
+                final boolean contentAlreadyLoaded = ((Boolean) bundleContentInfo
+                        .get(BundleContentLoaderListener.PROPERTY_CONTENT_LOADED)).booleanValue();
                 boolean isBundleUpdated = false;
-                Calendar lastLoadedAt = (Calendar) bundleContentInfo.get(ContentLoaderService.PROPERTY_CONTENT_LOADED_AT);
+                Calendar lastLoadedAt = (Calendar) bundleContentInfo
+                        .get(BundleContentLoaderListener.PROPERTY_CONTENT_LOADED_AT);
                 if (lastLoadedAt != null && lastLoadedAt.getTimeInMillis() < bundle.getLastModified()) {
                     isBundleUpdated = true;
                 }
                 if (!isUpdate && !isBundleUpdated && contentAlreadyLoaded) {
                     log.info("Content of bundle already loaded {}.", bundle.getSymbolicName());
                 } else {
-                    createdNodes = installContent(metadataSession, bundle, pathIter, contentAlreadyLoaded && !isBundleUpdated);
+                    createdNodes = installContent(metadataSession, bundle, pathIter,
+                            contentAlreadyLoaded && !isBundleUpdated);
                     if (isRetry) {
                         // log success of retry
                         log.info("Retrying to load initial content for bundle {} succeeded.", bundle.getSymbolicName());
@@ -159,7 +192,9 @@ public class BundleContentLoader extends BaseImportLoader {
             // if we are retrying we already logged this message once, so we
             // won't log it again
             if (!isRetry) {
-                log.error("Cannot load initial content for bundle " + bundle.getSymbolicName() + " : " + re.getMessage(), re);
+                log.error(
+                        "Cannot load initial content for bundle " + bundle.getSymbolicName() + " : " + re.getMessage(),
+                        re);
             }
         }
         return false;
@@ -176,7 +211,7 @@ public class BundleContentLoader extends BaseImportLoader {
             delayedBundles.remove(bundle);
         } else {
             try {
-                bundleHelper.createRepositoryPath(session, ContentLoaderService.BUNDLE_CONTENT_NODE);
+                bundleHelper.createRepositoryPath(session, BundleContentLoaderListener.BUNDLE_CONTENT_NODE);
 
                 final Map<String, Object> bundleContentInfo = bundleHelper.getBundleContentInfo(session, bundle, false);
 
@@ -187,13 +222,15 @@ public class BundleContentLoader extends BaseImportLoader {
                 }
 
                 try {
-                    uninstallContent(session, bundle, (String[]) bundleContentInfo.get(ContentLoaderService.PROPERTY_UNINSTALL_PATHS));
+                    uninstallContent(session, bundle,
+                            (String[]) bundleContentInfo.get(BundleContentLoaderListener.PROPERTY_UNINSTALL_PATHS));
                     bundleHelper.contentIsUninstalled(session, bundle);
                 } finally {
                     bundleHelper.unlockBundleContentInfo(session, bundle, false, null);
                 }
             } catch (RepositoryException re) {
-                log.error("Cannot remove initial content for bundle " + bundle.getSymbolicName() + " : " + re.getMessage(), re);
+                log.error("Cannot remove initial content for bundle " + bundle.getSymbolicName() + " : "
+                        + re.getMessage(), re);
             }
         }
     }
@@ -205,7 +242,8 @@ public class BundleContentLoader extends BaseImportLoader {
      *
      * @return If the content should be removed on uninstall, a list of top nodes
      */
-    private List<String> installContent(final Session defaultSession, final Bundle bundle, final Iterator<PathEntry> pathIter, final boolean contentAlreadyLoaded) throws RepositoryException {
+    private List<String> installContent(final Session defaultSession, final Bundle bundle,
+            final Iterator<PathEntry> pathIter, final boolean contentAlreadyLoaded) throws RepositoryException {
 
         final List<String> createdNodes = new ArrayList<>();
         final Map<String, Session> createdSessions = new HashMap<>();
@@ -215,6 +253,12 @@ public class BundleContentLoader extends BaseImportLoader {
         try {
             while (pathIter.hasNext()) {
                 final PathEntry pathEntry = pathIter.next();
+
+                if (!pathFilter.test(pathEntry.getTarget())) {
+                    log.debug("Path {} excluded by configuration", pathEntry.getPath());
+                    continue;
+                }
+
                 if (!contentAlreadyLoaded || pathEntry.isOverwrite()) {
                     String workspace = pathEntry.getWorkspace();
                     final Session targetSession;
@@ -232,7 +276,8 @@ public class BundleContentLoader extends BaseImportLoader {
                     final Node targetNode = getTargetNode(targetSession, pathEntry.getTarget());
 
                     if (targetNode != null) {
-                        installFromPath(bundle, pathEntry.getPath(), pathEntry, targetNode, pathEntry.isUninstall() ? createdNodes : null, contentCreator);
+                        installFromPath(bundle, pathEntry.getPath(), pathEntry, targetNode,
+                                pathEntry.isUninstall() ? createdNodes : null, contentCreator);
                     }
                 }
             }
@@ -263,8 +308,8 @@ public class BundleContentLoader extends BaseImportLoader {
 
             // finally check in versionable nodes
             for (final Node versionable : contentCreator.getVersionables()) {
-            	VersionManager versionManager = versionable.getSession().getWorkspace().getVersionManager();
-            	versionManager.checkin(versionable.getPath());
+                VersionManager versionManager = versionable.getSession().getWorkspace().getVersionManager();
+                versionManager.checkin(versionable.getPath());
             }
         } finally {
             try {
@@ -296,12 +341,15 @@ public class BundleContentLoader extends BaseImportLoader {
      * @param path          The path
      * @param configuration
      * @param parent        The parent node.
-     * @param createdNodes  An optional list to store all new nodes. This list is used for an uninstall
+     * @param createdNodes  An optional list to store all new nodes. This list is
+     *                      used for an uninstall
      * @throws RepositoryException
      */
-    private void installFromPath(final Bundle bundle, final String path, final PathEntry configuration, final Node parent, final List<String> createdNodes, final DefaultContentCreator contentCreator) throws RepositoryException {
+    private void installFromPath(final Bundle bundle, final String path, final PathEntry configuration,
+            final Node parent, final List<String> createdNodes, final DefaultContentCreator contentCreator)
+            throws RepositoryException {
 
-        //  init content creator
+        // init content creator
         contentCreator.init(configuration, getContentReaders(), createdNodes, null);
 
         final Map<String, Node> processedEntries = new HashMap<>();
@@ -314,7 +362,8 @@ public class BundleContentLoader extends BaseImportLoader {
                 log.info("install: No initial content entries at {} in bundle {}", path, bundle.getSymbolicName());
                 return;
             }
-            // we have a single file content, let's check if this has an content reader extension
+            // we have a single file content, let's check if this has an content reader
+            // extension
             for (String ext : contentCreator.getContentReaders().keySet()) {
                 if (path.endsWith(ext)) {
 
@@ -384,7 +433,9 @@ public class BundleContentLoader extends BaseImportLoader {
      * @param createdNodes
      * @throws RepositoryException
      */
-    private void handleFile(final String entry, final Bundle bundle, final Map<String, Node> processedEntries, final PathEntry configuration, final Node parent, final List<String> createdNodes, final DefaultContentCreator contentCreator) throws RepositoryException {
+    private void handleFile(final String entry, final Bundle bundle, final Map<String, Node> processedEntries,
+            final PathEntry configuration, final Node parent, final List<String> createdNodes,
+            final DefaultContentCreator contentCreator) throws RepositoryException {
 
         final URL file = bundle.getEntry(entry);
         final String name = getName(entry);
@@ -456,8 +507,8 @@ public class BundleContentLoader extends BaseImportLoader {
      * @return
      * @throws RepositoryException
      */
-    private Node createNode(Node parent, String name, URL resourceUrl, final DefaultContentCreator contentCreator, PathEntry configuration)
-            throws RepositoryException {
+    private Node createNode(Node parent, String name, URL resourceUrl, final DefaultContentCreator contentCreator,
+            PathEntry configuration) throws RepositoryException {
 
         final String resourcePath = resourceUrl.getPath().toLowerCase();
         InputStream contentStream = null;
@@ -523,7 +574,8 @@ public class BundleContentLoader extends BaseImportLoader {
      * @throws IOException
      * @throws RepositoryException
      */
-    private void createFile(PathEntry configuration, Node parent, URL source, List<String> createdNodes, final DefaultContentCreator contentCreator) throws IOException, RepositoryException {
+    private void createFile(PathEntry configuration, Node parent, URL source, List<String> createdNodes,
+            final DefaultContentCreator contentCreator) throws IOException, RepositoryException {
 
         final String srcPath = source.getPath();
         int pos = srcPath.lastIndexOf('/');
@@ -547,12 +599,12 @@ public class BundleContentLoader extends BaseImportLoader {
     }
 
     /**
-     * Gets and decodes the name part of the <code>path</code>. The name is
-     * the part of the path after the last slash (or the complete path if no
-     * slash is contained). To support names containing unsupported characters
-     * such as colon (<code>:</code>), names may be URL encoded (see
-     * <code>java.net.URLEncoder</code>) using the <i>UTF-8</i> character
-     * encoding. In this case, this method decodes the name using the
+     * Gets and decodes the name part of the <code>path</code>. The name is the part
+     * of the path after the last slash (or the complete path if no slash is
+     * contained). To support names containing unsupported characters such as colon
+     * (<code>:</code>), names may be URL encoded (see
+     * <code>java.net.URLEncoder</code>) using the <i>UTF-8</i> character encoding.
+     * In this case, this method decodes the name using the
      * <code>java.net.URLDecoder</code> class with the <i>UTF-8</i> character
      * encoding.
      *
@@ -618,6 +670,10 @@ public class BundleContentLoader extends BaseImportLoader {
             log.debug("Uninstalling initial content from bundle {}", bundle.getSymbolicName());
             if (uninstallPaths != null && uninstallPaths.length > 0) {
                 for (String path : uninstallPaths) {
+                    if (!pathFilter.test(path)) {
+                        log.debug("Path {} excluded by configuration", path);
+                        continue;
+                    }
                     final Session targetSession;
 
                     final int wsSepPos = path.indexOf(":/");
@@ -662,7 +718,8 @@ public class BundleContentLoader extends BaseImportLoader {
                     }
                 }
             } catch (RepositoryException re) {
-                log.warn("Failure to rollback uninstalling initial content for bundle {}", bundle.getSymbolicName(), re);
+                log.warn("Failure to rollback uninstalling initial content for bundle {}", bundle.getSymbolicName(),
+                        re);
             }
 
             for (Session session : createdSessions.values()) {
@@ -682,7 +739,8 @@ public class BundleContentLoader extends BaseImportLoader {
     /**
      * Return the parent node descriptor (ROOT).
      */
-    private Descriptor getParentNodeDescriptor(final Bundle bundle, final String path, final DefaultContentCreator contentCreator) {
+    private Descriptor getParentNodeDescriptor(final Bundle bundle, final String path,
+            final DefaultContentCreator contentCreator) {
 
         for (Map.Entry<String, ContentReader> entry : contentCreator.getContentReaders().entrySet()) {
             if (entry.getValue() != null) {
@@ -706,10 +764,11 @@ public class BundleContentLoader extends BaseImportLoader {
     }
 
     /**
-     * Imports mixin nodes and properties (and optionally child nodes) of the
-     * parent node.
+     * Imports mixin nodes and properties (and optionally child nodes) of the parent
+     * node.
      */
-    private URL importParentNode(Bundle bundle, String path, Node parent, final DefaultContentCreator contentCreator) throws RepositoryException {
+    private URL importParentNode(Bundle bundle, String path, Node parent, final DefaultContentCreator contentCreator)
+            throws RepositoryException {
 
         final Descriptor descriptor = getParentNodeDescriptor(bundle, path, contentCreator);
         // no parent descriptor (ROOT) found
