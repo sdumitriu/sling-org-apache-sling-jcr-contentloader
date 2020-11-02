@@ -83,9 +83,10 @@ public abstract class BaseImportLoader extends JcrXmlImporter {
     }
 
     /**
-     * Return the content reader for the name
+     * Return the content reader for the name and configuration
      *
      * @param name The file name.
+     * @param configuration The configuration to check if the importer is ignored for this path
      * @return The reader or <code>null</code>
      */
     public ContentReader getContentReader(String name, PathEntry configuration) {

@@ -55,7 +55,7 @@ public interface ContentCreator {
      * Indicates that a node is finished.
      * The parent node of the current node becomes the current node.
      *
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void finishNode() throws RepositoryException;
 
@@ -63,7 +63,7 @@ public interface ContentCreator {
     /**
      * Indicates that the import is finished
      *
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void finish() throws RepositoryException;
     
@@ -73,7 +73,7 @@ public interface ContentCreator {
      * @param name         The property name.
      * @param propertyType The type of the property.
      * @param value        The string value.
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createProperty(String name, int propertyType, String value) throws RepositoryException;
 
@@ -83,7 +83,7 @@ public interface ContentCreator {
      * @param name         The property name.
      * @param propertyType The type of the property.
      * @param values       The string values.
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createProperty(String name, int propertyType, String[] values) throws RepositoryException;
 
@@ -92,7 +92,7 @@ public interface ContentCreator {
      *
      * @param name  The property name.
      * @param value The value.
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createProperty(String name, Object value) throws RepositoryException;
 
@@ -101,7 +101,7 @@ public interface ContentCreator {
      *
      * @param name   The property name.
      * @param values The values.
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createProperty(String name, Object[] values) throws RepositoryException;
 
@@ -115,7 +115,7 @@ public interface ContentCreator {
      * @param data         The data of the file
      * @param mimeType     The mime type or null
      * @param lastModified The last modified or -1
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createFileAndResourceNode(String name, InputStream data, String mimeType, long lastModified) throws RepositoryException;
 
@@ -131,7 +131,7 @@ public interface ContentCreator {
      *
      * @param subPath     The relative path
      * @param newNodeType Node type for newly created nodes.
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     boolean switchCurrentNode(String subPath, String newNodeType) throws RepositoryException;
 
@@ -141,7 +141,7 @@ public interface ContentCreator {
      * @param name            the name of the user
      * @param password        the password of the user
      * @param extraProperties extra properties to assign to the created user
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createUser(String name, String password, Map<String, Object> extraProperties) throws RepositoryException;
 
@@ -172,7 +172,7 @@ public interface ContentCreator {
      *                          <tr><td>after xyz</td><td>Place the target ACE immediately after the sibling whose name is xyz</td></tr>
      *                          <tr><td>numeric</td><td>Place the target ACE at the specified index</td></tr>
      *                          </table>
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     void createAce(String principal, String[] grantedPrivileges, String[] deniedPrivileges, String order) throws RepositoryException;
 
@@ -196,7 +196,7 @@ public interface ContentCreator {
      * @param restrictions      specifies additional Map of single-value restrictions to apply. (optional)
      * @param mvRestrictions    specifies additional Map of multi-value restrictions to apply. (optional)
      * @param removedRestrictionNames optional set of restriction names that should be removed (if they already exist).
-     * @throws RepositoryException
+     * @throws RepositoryException If anything goes wrong.
      */
     default void createAce(String principal, String[] grantedPrivileges, String[] deniedPrivileges, String order, 
     		Map<String, Value> restrictions, Map<String, Value[]> mvRestrictions, Set<String> removedRestrictionNames) throws RepositoryException {

@@ -40,7 +40,7 @@ public interface ContentReader {
      * Read the content from the URL and create the
      * content using the provided content creator.
      * @param url The input stream.
-     * @throws IOException
+     * @throws IOException If anything goes wrong.
      */
     void parse(URL url, ContentCreator creator) throws IOException, RepositoryException;
 
@@ -48,7 +48,7 @@ public interface ContentReader {
      * Read the content from the input stream and create the
      * content using the provided content creator.
      * @param ins the input stream.
-     * @throws IOException
+     * @throws IOException If anything goes wrong.
      */
     void parse(InputStream ins, ContentCreator contentCreator) throws IOException, RepositoryException;
 

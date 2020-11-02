@@ -130,6 +130,11 @@
         <artifactId>org.osgi.service.metatype.annotations</artifactId>
         <scope>provided</scope>
       </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.annotation.bundle</artifactId>
+    </dependency>
+    
       <!-- -->
         <dependency>
             <groupId>javax.jcr</groupId>

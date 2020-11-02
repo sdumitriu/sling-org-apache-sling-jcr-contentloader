@@ -45,8 +45,8 @@ public interface ContentImporter {
      * @param contentStream  the content stream to be imported
      * @param importOptions  (optional) additional options to control the import
      * @param importListener (optional) listener to receive callbacks for each change in the import
-     * @throws RepositoryException
-     * @throws IOException
+     * @throws RepositoryException If anything goes wrong accessing the JCR repository
+     * @throws IOException If anything goes wrong reading or writing the content
      */
     void importContent(Node parent, String filename, InputStream contentStream, ImportOptions importOptions, ContentImportListener importListener) throws RepositoryException, IOException;
 
@@ -59,8 +59,8 @@ public interface ContentImporter {
      * @param contentStream  the content stream to be imported
      * @param importOptions  (optional) additional options to control the import
      * @param importListener (optional) listener to receive callbacks for each change in the import
-     * @throws RepositoryException
-     * @throws IOException
+     * @throws RepositoryException If anything goes wrong accessing the JCR repository
+     * @throws IOException If anything goes wrong reading or writing the content
      */
     void importContent(Node parent, String name, String contentType, InputStream contentStream, ImportOptions importOptions, ContentImportListener importListener) throws RepositoryException, IOException;
 

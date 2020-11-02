@@ -106,9 +106,8 @@ public class BundleContentLoader extends BaseImportLoader {
     /**
      * Register a bundle and install its content.
      *
-     * @param metadataSession
-     * @param bundle
-     * @throws RepositoryException
+     * @param metadataSession the JCR Session for reading/writing metadat
+     * @param bundle the bundle to install
      */
     public void registerBundle(final Session metadataSession, final Bundle bundle, final boolean isUpdate) {
 
@@ -203,6 +202,7 @@ public class BundleContentLoader extends BaseImportLoader {
     /**
      * Unregister a bundle. Remove installed content.
      *
+     * @param session the session to read/write the metadata
      * @param bundle The bundle.
      */
     public void unregisterBundle(final Session session, final Bundle bundle) {
