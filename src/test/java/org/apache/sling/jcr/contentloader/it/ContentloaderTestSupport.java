@@ -113,14 +113,14 @@ public abstract class ContentloaderTestSupport extends TestSupport {
             // SLING-9735 - add server user for the o.a.s.jcr.contentloader bundle
             factoryConfiguration("org.apache.sling.jcr.repoinit.RepositoryInitializer")
                 .put("scripts", new String[] {
-                        "create service user sling-content-loader\n" +
+                        "create service user sling-jcr-content-loader\n" +
                         "\n" +
-                        "set ACL for sling-content-loader\n" +
+                        "set ACL for sling-jcr-content-loader\n" +
                         "    allow   jcr:all    on /\n" +
                         "end"})
                 .asOption(),
             factoryConfiguration("org.apache.sling.serviceusermapping.impl.ServiceUserMapperImpl.amended")
-                .put("user.mapping", new String[]{"org.apache.sling.jcr.contentloader=sling-content-loader"})
+                .put("user.mapping", new String[]{"org.apache.sling.jcr.contentloader=sling-jcr-content-loader"})
                 .asOption(),
             // Sling JCR ContentLoader
             testBundle("bundle.filename"),
