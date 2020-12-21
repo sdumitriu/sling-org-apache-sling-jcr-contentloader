@@ -35,6 +35,7 @@ import javax.jcr.lock.LockManager;
 
 import org.apache.sling.commons.mime.MimeTypeService;
 import org.apache.sling.jcr.api.SlingRepository;
+import org.apache.sling.serviceusermapping.ServiceUserMapped;
 import org.apache.sling.settings.SlingSettingsService;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -75,6 +76,12 @@ public class BundleContentLoaderListener implements SynchronousBundleListener, B
 
     /** default log */
     final Logger log = LoggerFactory.getLogger(getClass());
+
+    /**
+     * SLING-10015 - To require a service user before becoming active
+     */
+    @Reference
+    private ServiceUserMapped serviceUserMapped;
 
     /**
      * The JCR Repository we access to resolve resources

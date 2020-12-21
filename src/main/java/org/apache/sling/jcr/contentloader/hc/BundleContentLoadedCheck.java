@@ -33,6 +33,7 @@ import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.jcr.contentloader.internal.BundleHelper;
 import org.apache.sling.jcr.contentloader.internal.BundleContentLoaderListener;
 import org.apache.sling.jcr.contentloader.internal.PathEntry;
+import org.apache.sling.serviceusermapping.ServiceUserMapped;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
@@ -84,6 +85,12 @@ public class BundleContentLoadedCheck implements HealthCheck {
     private Pattern includesRegex;
     private Pattern excludesRegex;
     boolean useCriticalForNotLoaded;
+
+    /**
+     * SLING-10015 - To require a service user before becoming active
+     */
+    @Reference
+    private ServiceUserMapped serviceUserMapped;
 
     /**
      * The JCR Repository we access to resolve resources
