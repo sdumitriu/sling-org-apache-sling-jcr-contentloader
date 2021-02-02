@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +127,8 @@ public class DefaultContentCreator implements ContentCreator {
      */
     private ContentImportListener importListener;
 
-    private Set<String> appliedSet = new LinkedHashSet<>();
+    private Map<String, Set<String>> addedProperties = new HashMap<>();
+
     private Set<String> importedNodes = new LinkedHashSet<>();
 
     /**
@@ -255,6 +257,11 @@ public class DefaultContentCreator implements ContentCreator {
             if (parentNode.hasNode(name)) {
                 // use existing node
                 node = parentNode.getNode(name);
+                try {
+                    parentNode.orderBefore(name, null);
+                } catch (RepositoryException ex) {
+                    // Ignore this
+                }
             } else if (primaryNodeType == null) {
                 // no explicit node type, use repository default
                 checkoutIfNecessary(parentNode);
@@ -301,8 +308,9 @@ public class DefaultContentCreator implements ContentCreator {
      * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String,
      *      int, java.lang.String)
      */
+    @Override
     public void createProperty(String name, int propertyType, String value) throws RepositoryException {
-        appliedSet.add(name);
+        propertyAdded(name);
         final Node node = this.parentNodeStack.peek();
         // check if the property already exists and isPropertyOverwrite() is false,
         // don't overwrite it in this case
@@ -351,8 +359,9 @@ public class DefaultContentCreator implements ContentCreator {
      * @see org.apache.sling.jcr.contentloader.ContentCreator#createProperty(java.lang.String,
      *      int, java.lang.String[])
      */
+    @Override
     public void createProperty(String name, int propertyType, String[] values) throws RepositoryException {
-        appliedSet.add(name);
+        propertyAdded(name);
         final Node node = this.parentNodeStack.peek();
         // check if the property already exists and isPropertyOverwrite() is false,
         // don't overwrite it in this case
@@ -459,21 +468,27 @@ public class DefaultContentCreator implements ContentCreator {
 
     private void cleanUpNode(Node node) throws RepositoryException {
         if (configuration.isPropertyMerge()) {
+            Set<String> properties = this.addedProperties.getOrDefault(node.getPath(), Collections.emptySet());
             PropertyIterator it = node.getProperties();
             while (it.hasNext()) {
-                Property prop= it.nextProperty();
+                Property prop = it.nextProperty();
                 String propertyName = prop.getName();
-                if (appliedSet.contains(propertyName)) {
+                if (properties.contains(propertyName)) {
+                    // We keep properties that have been imported
                     continue;
                 }
-                if (!prop.getDefinition().isProtected()) {
-                    if (importListener != null) {
-                        importListener.onDelete(prop.getPath());
-                    }
-                    prop.remove();
-                    log.trace(propertyName);
+                if (prop.getDefinition().isProtected() || prop.getDefinition().isAutoCreated()
+                    || prop.getDefinition().isMandatory()) {
+                    // We also keep those that are protected, auto-created, or mandatory
+                    continue;
                 }
+                if (this.importListener != null) {
+                    this.importListener.onDelete(prop.getPath());
+                }
+                prop.remove();
+                this.log.trace("Removed old property {}", propertyName);
             }
+            this.addedProperties.remove(node.getPath());
         }
     }
 
@@ -631,7 +646,7 @@ public class DefaultContentCreator implements ContentCreator {
                 this.importListener.onModify(node.getProperty(name).getPath());
             }
         }
-        appliedSet.add(name);
+        propertyAdded(name);
     }
 
     private void createProperty(String name, Object[] values, boolean overwriteExisting) throws RepositoryException {
@@ -660,7 +675,7 @@ public class DefaultContentCreator implements ContentCreator {
                 this.importListener.onModify(node.getProperty(name).getPath());
             }
         }
-        appliedSet.add(name);
+        propertyAdded(name);
     }
 
     /**
@@ -965,35 +980,16 @@ public class DefaultContentCreator implements ContentCreator {
     public void finish() throws RepositoryException {
         if (this.configuration.isMerge()) {
             Session session = this.createdRootNode.getSession();
-            importedNodes.stream().flatMap(n -> {
-                Set<String> iterable = getPeers(n,session);
+            this.importedNodes.stream().flatMap(n -> {
+                Set<String> iterable = getChildren(n, session);
                 return StreamSupport.stream(iterable.spliterator(), false);
-            }).filter(path -> !importedNodes.contains(path)).forEach(path -> removeNode(path,session));
-            importedNodes.stream().flatMap(n -> {
-                Set<String> iterable = getChildren(n,session);
-                return StreamSupport.stream(iterable.spliterator(), false);
-            }).filter(path -> !importedNodes.contains(path)).forEach(path -> removeNode(path,session));
+            }).filter(path -> !this.importedNodes.contains(path)).forEach(path -> removeNode(path, session));
         }
+        this.importedNodes.clear();
+        this.addedProperties.clear();
     }
-    
-    private Set<String> getPeers(String path,Session session) {
-            try {
-                log.debug("finding peers for {}", path);
-                NodeIterator it = session.getNode(path).getParent().getNodes();
-                Set<String> peers = new LinkedHashSet<>();
-                while (it.hasNext()) {
-                    String child = it.nextNode().getPath();
-                    if (!child.equals(path)) {
-                        peers.add(child);
-                    }
-                }
-                return peers;
-            } catch (RepositoryException e) {
-                return Collections.emptySet();
-            }
-    }
-    
-    private Set<String> getChildren(String path,Session session) {
+
+    private Set<String> getChildren(String path, Session session) {
         try {
             log.debug("finding children for {}", path);
             NodeIterator it = session.getNode(path).getNodes();
@@ -1006,20 +1002,38 @@ public class DefaultContentCreator implements ContentCreator {
         } catch (RepositoryException e) {
             return Collections.emptySet();
         }
-}
-    
-    private void removeNode(String item, Session session) {
-        try {
-            if (this.importListener != null) {
-                this.importListener.onDelete(item);
-            }
-            log.debug("removing {}", item);
-            session.removeItem(item);
-            session.save();
-        } catch (RepositoryException e) {
-            log.warn("unable to remove node {}", item);
-        }
-        
     }
 
+    private void removeNode(String item, Session session)
+    {
+        try {
+            Item toRemove = session.getItem(item);
+            try {
+                if (this.importListener != null) {
+                    this.importListener.onDelete(item);
+                }
+                session.save();
+                this.log.debug("removing {}", item);
+                session.removeItem(item);
+                session.save();
+            } catch (RepositoryException e) {
+                this.log.warn("unable to remove node {}", item);
+                toRemove.refresh(false);
+            }
+        } catch (RepositoryException e1) {
+            this.log.warn("Failed to access {}", item);
+        }
+    }
+
+    private void propertyAdded(String name)
+    {
+        if (this.configuration.isPropertyMerge()) {
+            try {
+                this.addedProperties.computeIfAbsent(this.parentNodeStack.peek().getPath(), k -> new HashSet<>()).add(name);
+            } catch (RepositoryException e) {
+                // Should not happen
+                this.log.warn("Failed to access {}", this.parentNodeStack.peek());
+            }
+        }
+    }
 }

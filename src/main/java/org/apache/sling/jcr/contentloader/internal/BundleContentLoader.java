@@ -145,6 +145,7 @@ public class BundleContentLoader extends BaseImportLoader {
         if (pathIter == null) {
             log.debug("Bundle {} has no initial content", bundle.getSymbolicName());
             return true;
+            // FIXME also cleanup old content here
         }
 
         try {
@@ -180,7 +181,8 @@ public class BundleContentLoader extends BaseImportLoader {
                         log.info("Retrying to load initial content for bundle {} succeeded.", bundle.getSymbolicName());
                     }
                 }
-
+                cleanupBundle((String[]) bundleContentInfo.get(BundleContentLoaderListener.PROPERTY_UNINSTALL_PATHS),
+                    createdNodes, metadataSession, bundle);
                 success = true;
                 return true;
             } finally {
@@ -594,6 +596,7 @@ public class BundleContentLoader extends BaseImportLoader {
         final String type = conn.getContentType();
         final InputStream data = conn.getInputStream();
         contentCreator.createFileAndResourceNode(path, data, type, lastModified);
+        // Called twice because a file uses two nodes, an nt:file and an nt:resource
         contentCreator.finishNode();
         contentCreator.finishNode();
     }
@@ -662,6 +665,16 @@ public class BundleContentLoader extends BaseImportLoader {
         return (item.isNode()) ? (Node) item : null;
     }
 
+    private void cleanupBundle(final String[] previousContent, final List<String> newContent,
+        final Session defaultSession, final Bundle bundle)
+    {
+        if (newContent != null && !newContent.isEmpty() && previousContent != null && previousContent.length > 0) {
+            final String[] deprecatedContent =
+                Arrays.asList(previousContent).stream().filter(path -> !newContent.contains(path)).toArray(String[]::new);
+            uninstallContent(defaultSession, bundle, deprecatedContent);
+        }
+    }
+
     private void uninstallContent(final Session defaultSession, final Bundle bundle, final String[] uninstallPaths) {
 
         final Map<String, Session> createdSessions = new HashMap<>();
@@ -694,6 +707,7 @@ public class BundleContentLoader extends BaseImportLoader {
 
                     if (targetSession.itemExists(path)) {
                         targetSession.getItem(path).remove();
+                        this.log.debug("Removed {}", path);
                     }
                 }
 

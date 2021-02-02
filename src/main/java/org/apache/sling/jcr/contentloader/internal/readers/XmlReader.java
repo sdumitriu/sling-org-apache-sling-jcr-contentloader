@@ -164,6 +164,7 @@ public class XmlReader implements ContentReader {
             // We need to buffer input, so that we can reset the stream if we encounter an
             // XSL stylesheet reference
             parseInternal(bufferedInput, creator, url);
+            creator.finish();
         } catch (XmlPullParserException xppe) {
             throw (IOException) new IOException(xppe.getMessage()).initCause(xppe);
         }
@@ -185,6 +186,7 @@ public class XmlReader implements ContentReader {
             bufferedInput = new BufferedInputStream(ins);
             URL xmlLocation = null;
             parseInternal(bufferedInput, creator, xmlLocation);
+            creator.finish();
         } catch (XmlPullParserException xppe) {
             throw (IOException) new IOException(xppe.getMessage()).initCause(xppe);
         } finally {
